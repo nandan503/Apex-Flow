@@ -1,0 +1,20 @@
+[
+  {
+    "route_id": "RTE001",
+    "pickup": "Delhi",
+    "destination": "Jaipur",
+    "distance_km": 286.0,
+    "estimated_time": "3h 20m",
+    "fuel_cost_est": 2480.0,
+    "recommended_route": "Via NH48 Expressway"
+  },
+  {
+    "route_id": "RTE002",
+    "pickup": "Ludhiana",
+    "destination": "Delhi",
+    "distance_km": 315.0,
+    "estimated_time": "4h 45m",
+    "fuel_cost_est": 3100.0,
+    "recommended_route": "Via NH44 Express Highway"
+  }
+]

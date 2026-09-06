@@ -1,0 +1,52 @@
+[
+  {
+    "vehicle_id": "VEH001",
+    "registration_number": "HR26BX4587",
+    "vehicle_type": "Truck",
+    "make": "Tata Motors",
+    "model": "Prima 2830.K",
+    "capacity_mt": 15.0,
+    "current_location": "Delhi",
+    "status": "Available"
+  },
+  {
+    "vehicle_id": "VEH002",
+    "registration_number": "PB10CD1234",
+    "vehicle_type": "Container",
+    "make": "Ashok Leyland",
+    "model": "AVTR 3520",
+    "capacity_mt": 25.0,
+    "current_location": "Jaipur",
+    "status": "On Trip"
+  },
+  {
+    "vehicle_id": "VEH003",
+    "registration_number": "UP32KL5678",
+    "vehicle_type": "Tata Ace",
+    "make": "Tata Motors",
+    "model": "Ace Gold",
+    "capacity_mt": 5.0,
+    "current_location": "Ludhiana",
+    "status": "Available"
+  },
+  {
+    "vehicle_id": "VEH004",
+    "registration_number": "RJ14GH9012",
+    "vehicle_type": "Truck",
+    "make": "BharatBenz",
+    "model": "1617R",
+    "capacity_mt": 12.0,
+    "current_location": "Jaipur",
+    "status": "Maintenance"
+  },
+  {
+    "vehicle_id": "VEH005",
+    "registration_number": "DL8CAB6789",
+    "vehicle_type": "Container",
+    "make": "Mahindra",
+    "model": "Blazo X 28",
+    "capacity_mt": 20.0,
+    "current_location": "Mumbai",
+    "status": "On Trip"
+  }
+]

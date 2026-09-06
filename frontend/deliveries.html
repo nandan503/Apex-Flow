@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Deliveries - APEX FLOW | Smart Transport & Logistics</title>
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/forms.css">
+  <link rel="stylesheet" href="css/tables.css">
+  <link rel="stylesheet" href="css/responsive.css">
+</head>
+<body>
+
+<div class="app">
+  <aside class="sidebar">
+    <div class="logo">
+      <div class="logo-icon"></div>
+      <div class="logo-text">
+        <h1>APEX <span>FLOW</span></h1>
+        <p>Smart Transport & Logistics</p>
+      </div>
+    </div>
+    <ul class="menu">
+      <li><a href="dashboard.html"><span class="menu-icon">⌂</span><span>Dashboard</span></a></li>
+      <li><a href="shipments.html"><span class="menu-icon">📦</span><span>Shipments</span></a></li>
+      <li><a href="vehicles.html"><span class="menu-icon">🚚</span><span>Vehicles</span></a></li>
+      <li><a href="drivers.html"><span class="menu-icon">👤</span><span>Drivers</span></a></li>
+      <li><a href="tracking.html"><span class="menu-icon">📍</span><span>Live Tracking</span></a></li>
+      <li><a href="routes.html"><span class="menu-icon">🗺</span><span>Routes</span></a></li>
+      <li><a href="customers.html"><span class="menu-icon">🏢</span><span>Customers</span></a></li>
+      <li><a href="warehouses.html"><span class="menu-icon">🏭</span><span>Warehouses</span></a></li>
+      <li><a href="deliveries.html" class="active"><span class="menu-icon">📦</span><span>Deliveries</span></a></li>
+      <li><a href="payments.html"><span class="menu-icon">💳</span><span>Payments</span></a></li>
+      <li><a href="reports.html"><span class="menu-icon">📊</span><span>Reports</span></a></li>
+      <li><a href="notifications.html"><span class="menu-icon">🔔</span><span>Notifications</span></a></li>
+      <li><a href="settings.html"><span class="menu-icon">⚙</span><span>Settings</span></a></li>
+    </ul>
+  </aside>
+
+  <main class="main">
+    <header class="topbar">
+      <div class="topbar-left">
+        <button class="mobile-toggle-btn" id="sidebarToggleBtn" aria-label="Toggle Navigation Menu">☰</button>
+        <div class="search-bar">
+          <span class="search-icon">🔍</span>
+          <input type="text" placeholder="Search delivery ID, shipment ID...">
+        </div>
+      </div>
+
+      <div class="topbar-right">
+        <a href="notifications.html" class="notif-badge">🔔 <span id="notifCount" class="count" style="display:none;">0</span></a>
+        <div class="user-profile" onclick="handleLogout()">
+          <div id="topbarUserAvatar" class="user-avatar">A</div>
+          <div class="user-info">
+            <div id="topbarUserName" class="user-name">System Admin</div>
+            <div id="topbarUserRole" class="user-role">ADMIN</div>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <section class="content">
+      <div class="page-header">
+        <div>
+          <h2>📦 Final Delivery & OTP Verification</h2>
+          <p>Verify customer drop-offs, record receiver signatures, and validate OTP security codes</p>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="table-responsive">
+          <table class="table" id="deliveriesTable">
+            <thead>
+              <tr>
+                <th>Delivery ID</th>
+                <th>Shipment ID</th>
+                <th>Customer</th>
+                <th>Route</th>
+                <th>Expected Delivery</th>
+                <th>Status</th>
+                <th>OTP Code</th>
+                <th>Verification</th>
+              </tr>
+            </thead>
+            <tbody id="deliveriesTableBody">
+              <tr><td colspan="8" style="text-align:center; padding:20px;">Loading deliveries list...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<!-- OTP CONFIRMATION MODAL -->
+<div class="modal-backdrop" id="otpDeliveryModal">
+  <div class="modal-dialog" style="max-width:440px;">
+    <div class="modal-header">
+      <h3>Customer OTP Delivery Confirmation</h3>
+      <button class="modal-close" onclick="closeModal('otpDeliveryModal')">&times;</button>
+    </div>
+    <form id="otpConfirmForm" onsubmit="handleOTPConfirmSubmit(event)">
+      <input type="hidden" id="otpModalShipmentId">
+      <div class="modal-body">
+        <div style="background:var(--light-blue); padding:12px; border-radius:var(--radius-sm); margin-bottom:16px; font-size:12px;">
+          Expected Receiver Security OTP: <strong id="otpModalExpected" style="color:var(--accent-blue); font-weight:800; font-size:16px;">--</strong>
+        </div>
+        <div class="form-group">
+          <label>Enter 4-Digit OTP Code</label>
+          <input type="text" id="otpInputCode" class="form-control" placeholder="e.g. 4912" required style="font-size:18px; font-weight:700; text-align:center; letter-spacing:4px;">
+        </div>
+        <div class="form-group">
+          <label>Receiver Name</label>
+          <input type="text" id="otpReceiverName" class="form-control" placeholder="Vikram Malhotra" required>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('otpDeliveryModal')">Cancel</button>
+        <button type="submit" class="btn btn-success">Verify & Mark Delivered</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script src="js/app.js"></script>
+<script src="js/deliveries.js"></script>
+</body>
+</html>

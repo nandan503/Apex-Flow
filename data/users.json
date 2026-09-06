@@ -1,0 +1,30 @@
+[
+  {
+    "user_id": "USR001",
+    "name": "System Admin",
+    "email": "admin@apexflow.com",
+    "role": "ADMIN",
+    "phone": "+91 9876543210"
+  },
+  {
+    "user_id": "USR002",
+    "name": "Logistics Manager",
+    "email": "manager@apexflow.com",
+    "role": "MANAGER",
+    "phone": "+91 9876543211"
+  },
+  {
+    "user_id": "USR003",
+    "name": "Rajesh Kumar",
+    "email": "driver@apexflow.com",
+    "role": "DRIVER",
+    "phone": "+91 9876543212"
+  },
+  {
+    "user_id": "USR004",
+    "name": "ABC Industries",
+    "email": "customer@apexflow.com",
+    "role": "CUSTOMER",
+    "phone": "+91 9876543213"
+  }
+]

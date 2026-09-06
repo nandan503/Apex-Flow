@@ -1,0 +1,1269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>APEX FLOW - Smart Transport & Logistics</title>
+
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: Arial, Helvetica, sans-serif;
+    }
+
+    body {
+      background: #f4f7fb;
+      color: #14213d;
+    }
+
+    .app {
+      display: flex;
+      min-height: 100vh;
+    }
+
+    /* SIDEBAR */
+    .sidebar {
+      width: 250px;
+      background: linear-gradient(180deg, #062b57, #031b39);
+      color: white;
+      padding: 22px 15px;
+      position: fixed;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      overflow-y: auto;
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 35px;
+      padding-left: 8px;
+    }
+
+    .logo-icon {
+      width: 48px;
+      height: 48px;
+      background: #0789ff;
+      clip-path: polygon(50% 0, 100% 100%, 70% 100%, 50% 55%, 30% 100%, 0 100%);
+    }
+
+    .logo h1 {
+      font-size: 26px;
+      letter-spacing: 1px;
+    }
+
+    .logo h1 span {
+      color: #09a6ff;
+    }
+
+    .logo p {
+      font-size: 11px;
+      color: #d5e5f5;
+      margin-top: 3px;
+    }
+
+    .menu {
+      list-style: none;
+    }
+
+    .menu li {
+      margin: 8px 0;
+    }
+
+    .menu a {
+      display: flex;
+      align-items: center;
+      gap: 15px;
+      color: #dcecff;
+      text-decoration: none;
+      padding: 13px 14px;
+      border-radius: 8px;
+      transition: .2s;
+      cursor: pointer;
+    }
+
+    .menu a:hover,
+    .menu a.active {
+      background: #0789ff;
+      color: white;
+    }
+
+    .menu-icon {
+      width: 23px;
+      text-align: center;
+      font-size: 19px;
+    }
+
+    .sidebar-bottom {
+      position: absolute;
+      bottom: 30px;
+      left: 30px;
+      right: 20px;
+      color: white;
+    }
+
+    .truck {
+      font-size: 50px;
+      margin-bottom: 15px;
+    }
+
+    .sidebar-bottom h3 {
+      font-size: 18px;
+      line-height: 1.3;
+    }
+
+    .line {
+      width: 35px;
+      height: 3px;
+      background: #08a5ff;
+      margin-top: 10px;
+    }
+
+    /* MAIN */
+    .main {
+      margin-left: 250px;
+      width: calc(100% - 250px);
+    }
+
+    /* TOP BAR */
+    .topbar {
+      height: 72px;
+      background: white;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 28px;
+      border-bottom: 1px solid #e1e8f0;
+    }
+
+    .search {
+      width: 350px;
+      background: #f0f5fb;
+      border: 1px solid #d7e3ef;
+      border-radius: 9px;
+      padding: 11px 15px;
+      color: #54708f;
+    }
+
+    .user {
+      display: flex;
+      align-items: center;
+      gap: 15px;
+    }
+
+    .notification {
+      font-size: 22px;
+      position: relative;
+    }
+
+    .notification span {
+      position: absolute;
+      top: -7px;
+      right: -7px;
+      background: #ff394c;
+      color: white;
+      border-radius: 50%;
+      font-size: 10px;
+      padding: 3px 6px;
+    }
+
+    .avatar {
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      background: #0758ad;
+      color: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+    }
+
+    /* CONTENT */
+    .content {
+      padding: 25px 28px;
+    }
+
+    .page-title {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 20px;
+    }
+
+    .page-title h2 {
+      font-size: 24px;
+    }
+
+    .page-title p {
+      color: #71849a;
+      margin-top: 5px;
+      font-size: 13px;
+    }
+
+    .date {
+      background: white;
+      border: 1px solid #dbe4ee;
+      padding: 11px 18px;
+      border-radius: 8px;
+    }
+
+    /* GRID */
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 15px;
+      margin-bottom: 20px;
+    }
+
+    .stat {
+      padding: 20px;
+      border-radius: 10px;
+      color: white;
+      min-height: 125px;
+    }
+
+    .stat.blue {
+      background: linear-gradient(135deg, #087cf0, #0a9bff);
+    }
+
+    .stat.green {
+      background: linear-gradient(135deg, #08a75a, #16c979);
+    }
+
+    .stat.purple {
+      background: linear-gradient(135deg, #6946d8, #895be9);
+    }
+
+    .stat.red {
+      background: linear-gradient(135deg, #ef3348, #ff5362);
+    }
+
+    .stat-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .stat-icon {
+      font-size: 28px;
+    }
+
+    .stat h3 {
+      font-size: 13px;
+      font-weight: normal;
+    }
+
+    .stat .number {
+      font-size: 27px;
+      font-weight: bold;
+      margin: 10px 0 4px;
+    }
+
+    /* CARDS */
+    .card {
+      background: white;
+      border: 1px solid #dde6ef;
+      border-radius: 10px;
+      overflow: hidden;
+    }
+
+    .card-header {
+      padding: 13px 15px;
+      border-bottom: 1px solid #e6edf4;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-weight: bold;
+    }
+
+    .card-header a {
+      color: #087cf0;
+      font-size: 12px;
+      cursor: pointer;
+    }
+
+    .middle-grid {
+      display: grid;
+      grid-template-columns: 1.35fr .9fr 1.05fr;
+      gap: 15px;
+      margin-bottom: 15px;
+    }
+
+    /* MAP */
+    .map {
+      height: 250px;
+      position: relative;
+      background:
+        linear-gradient(120deg, transparent 45%, #d8e6d1 46%, #d8e6d1 50%, transparent 51%),
+        linear-gradient(40deg, transparent 48%, #c8d7e5 49%, #c8d7e5 51%, transparent 52%),
+        #e9f1df;
+      overflow: hidden;
+    }
+
+    .map::before {
+      content: "";
+      position: absolute;
+      width: 80%;
+      height: 4px;
+      background: #087cf0;
+      transform: rotate(33deg);
+      top: 115px;
+      left: 55px;
+      border-radius: 10px;
+    }
+
+    .location {
+      position: absolute;
+      font-weight: bold;
+      font-size: 13px;
+    }
+
+    .delhi {
+      top: 25px;
+      left: 65px;
+    }
+
+    .jaipur {
+      bottom: 35px;
+      right: 55px;
+    }
+
+    .pin {
+      font-size: 25px;
+      color: #08a75a;
+    }
+
+    .pin.red {
+      color: #ef3348;
+    }
+
+    .vehicle {
+      position: absolute;
+      top: 105px;
+      left: 48%;
+      font-size: 30px;
+    }
+
+    .tracking-info {
+      padding: 13px 15px;
+    }
+
+    .tracking-info p {
+      margin: 9px 0;
+      color: #627991;
+      font-size: 13px;
+    }
+
+    .tracking-info strong {
+      color: #14213d;
+      float: right;
+    }
+
+    .btn {
+      border: none;
+      background: #087cf0;
+      color: white;
+      padding: 10px 15px;
+      border-radius: 7px;
+      cursor: pointer;
+      font-weight: bold;
+    }
+
+    .btn:hover {
+      background: #0668ca;
+    }
+
+    /* DONUT */
+    .donut-area {
+      height: 250px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 25px;
+      padding: 15px;
+    }
+
+    .donut {
+      width: 135px;
+      height: 135px;
+      border-radius: 50%;
+      background: conic-gradient(
+        #08a75a 0 22%,
+        #087cf0 22% 40%,
+        #f59e0b 40% 70%,
+        #6946d8 70% 96%,
+        #ef3348 96% 100%
+      );
+      position: relative;
+    }
+
+    .donut::after {
+      content: "125\A Total";
+      white-space: pre;
+      position: absolute;
+      inset: 30px;
+      background: white;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      font-weight: bold;
+    }
+
+    .legend {
+      font-size: 12px;
+    }
+
+    .legend div {
+      margin: 12px 0;
+    }
+
+    .dot {
+      display: inline-block;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      margin-right: 7px;
+    }
+
+    /* TABLE */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+    }
+
+    th,
+    td {
+      padding: 12px 10px;
+      text-align: left;
+      border-bottom: 1px solid #edf1f5;
+    }
+
+    th {
+      color: #3e5871;
+      background: #f8fafc;
+    }
+
+    .status {
+      display: inline-block;
+      padding: 5px 9px;
+      border-radius: 12px;
+      font-size: 11px;
+    }
+
+    .transit {
+      background: #dceeff;
+      color: #0870dc;
+    }
+
+    .picked {
+      background: #d9f8e8;
+      color: #07864b;
+    }
+
+    .delivered {
+      background: #d9f8e8;
+      color: #07864b;
+    }
+
+    .delayed {
+      background: #ffe0e4;
+      color: #e62b3e;
+    }
+
+    /* LOWER GRID */
+    .lower-grid {
+      display: grid;
+      grid-template-columns: 1.1fr .9fr 1fr;
+      gap: 15px;
+      margin-bottom: 15px;
+    }
+
+    .table-card {
+      min-height: 250px;
+    }
+
+    /* ROUTE */
+    .route-content {
+      padding: 15px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 15px;
+    }
+
+    .route-details p {
+      margin: 14px 0;
+      font-size: 13px;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .optimized {
+      display: inline-block;
+      padding: 6px 8px;
+      background: #d9f8e8;
+      color: #07864b;
+      border-radius: 7px;
+      font-size: 11px;
+    }
+
+    /* DELIVERY */
+    .delivery {
+      padding: 15px;
+      display: flex;
+      gap: 30px;
+    }
+
+    .timeline {
+      border-left: 3px solid #08a75a;
+      padding-left: 20px;
+      flex: 1;
+    }
+
+    .timeline-item {
+      position: relative;
+      margin-bottom: 20px;
+    }
+
+    .timeline-item::before {
+      content: "✓";
+      position: absolute;
+      left: -34px;
+      width: 21px;
+      height: 21px;
+      border-radius: 50%;
+      background: #08a75a;
+      color: white;
+      text-align: center;
+      line-height: 21px;
+      font-size: 12px;
+    }
+
+    .timeline-item.pending::before {
+      content: "";
+      background: white;
+      border: 3px solid #9aabba;
+    }
+
+    .timeline-item h4 {
+      font-size: 13px;
+    }
+
+    .timeline-item p {
+      font-size: 11px;
+      color: #71849a;
+      margin-top: 4px;
+    }
+
+    .on-time {
+      text-align: center;
+      padding: 35px 10px;
+      font-size: 16px;
+      font-weight: bold;
+    }
+
+    .on-time .big-truck {
+      font-size: 55px;
+      margin-bottom: 15px;
+    }
+
+    /* WORKFLOW */
+    .workflow-card {
+      margin-bottom: 15px;
+    }
+
+    .workflow {
+      display: flex;
+      justify-content: space-between;
+      padding: 22px 20px;
+    }
+
+    .step {
+      text-align: center;
+      flex: 1;
+      position: relative;
+    }
+
+    .step::after {
+      content: "→";
+      position: absolute;
+      right: -8px;
+      top: 10px;
+      color: #087cf0;
+      font-size: 20px;
+    }
+
+    .step:last-child::after {
+      display: none;
+    }
+
+    .step-icon {
+      width: 38px;
+      height: 38px;
+      border-radius: 50%;
+      background: #087cf0;
+      color: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: auto;
+    }
+
+    .step p {
+      margin-top: 8px;
+      font-size: 10px;
+      font-weight: bold;
+    }
+
+    /* FEATURES */
+    .features {
+      padding: 18px;
+    }
+
+    .feature-list {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      font-size: 12px;
+    }
+
+    .feature-list div::before {
+      content: "✓";
+      color: #087cf0;
+      font-weight: bold;
+      margin-right: 8px;
+    }
+
+    /* RESPONSIVE */
+    @media (max-width: 1200px) {
+      .stats {
+        grid-template-columns: repeat(2, 1fr);
+      }
+
+      .middle-grid,
+      .lower-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 800px) {
+      .sidebar {
+        width: 70px;
+        padding: 15px 8px;
+      }
+
+      .logo h1,
+      .logo p,
+      .menu a span,
+      .sidebar-bottom {
+        display: none;
+      }
+
+      .logo {
+        justify-content: center;
+      }
+
+      .main {
+        margin-left: 70px;
+        width: calc(100% - 70px);
+      }
+
+      .stats {
+        grid-template-columns: 1fr;
+      }
+
+      .topbar {
+        padding: 0 15px;
+      }
+
+      .search {
+        width: 55%;
+      }
+
+      .content {
+        padding: 15px;
+      }
+
+      .workflow {
+        overflow-x: auto;
+        justify-content: flex-start;
+        gap: 35px;
+      }
+
+      .step {
+        min-width: 100px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+<div class="app">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+
+    <div class="logo">
+      <div class="logo-icon"></div>
+      <div>
+        <h1>APEX <span>FLOW</span></h1>
+        <p>Smart Transport & Logistics</p>
+        <p>Management System</p>
+      </div>
+    </div>
+
+    <ul class="menu">
+      <li><a class="active"><span class="menu-icon">⌂</span><span>Dashboard</span></a></li>
+      <li><a><span class="menu-icon">▤</span><span>Shipments</span></a></li>
+      <li><a><span class="menu-icon">🚚</span><span>Vehicles</span></a></li>
+      <li><a><span class="menu-icon">♟</span><span>Drivers</span></a></li>
+      <li><a><span class="menu-icon">📍</span><span>Tracking</span></a></li>
+      <li><a><span class="menu-icon">◈</span><span>Routes</span></a></li>
+      <li><a><span class="menu-icon">▣</span><span>Reports</span></a></li>
+      <li><a><span class="menu-icon">⚙</span><span>Settings</span></a></li>
+    </ul>
+
+    <div class="sidebar-bottom">
+      <div class="truck">🚛</div>
+      <h3>Connecting<br>Businesses<br>Across Miles</h3>
+      <div class="line"></div>
+    </div>
+
+  </aside>
+
+
+  <!-- MAIN -->
+  <main class="main">
+
+    <!-- TOPBAR -->
+    <header class="topbar">
+      <input
+        class="search"
+        type="text"
+        placeholder="🔍  Search shipments, vehicles, drivers..."
+      >
+
+      <div class="user">
+        <div class="notification">♧<span>3</span></div>
+        <div class="avatar">A</div>
+        <b>Admin</b>
+        <span>⌄</span>
+      </div>
+    </header>
+
+
+    <section class="content">
+
+      <!-- TITLE -->
+      <div class="page-title">
+        <div>
+          <h2>▦ &nbsp; Dashboard</h2>
+          <p>Overview of your transport and logistics operations</p>
+        </div>
+
+        <div class="date">
+          📅 Today (11 Aug 2025) &nbsp;⌄
+        </div>
+      </div>
+
+
+      <!-- STAT CARDS -->
+      <div class="stats">
+
+        <div class="stat blue">
+          <div class="stat-top">
+            <h3>Total Shipments</h3>
+            <div class="stat-icon">📦</div>
+          </div>
+          <div class="number">125</div>
+          <div>↑ 12%</div>
+          <small>vs last week</small>
+        </div>
+
+        <div class="stat green">
+          <div class="stat-top">
+            <h3>In Transit</h3>
+            <div class="stat-icon">🚚</div>
+          </div>
+          <div class="number">38</div>
+          <div>↑ 8%</div>
+          <small>vs last week</small>
+        </div>
+
+        <div class="stat purple">
+          <div class="stat-top">
+            <h3>Delivered</h3>
+            <div class="stat-icon">✓</div>
+          </div>
+          <div class="number">82</div>
+          <div>↑ 15%</div>
+          <small>vs last week</small>
+        </div>
+
+        <div class="stat red">
+          <div class="stat-top">
+            <h3>Delayed</h3>
+            <div class="stat-icon">⚠</div>
+          </div>
+          <div class="number">5</div>
+          <div>↓ 3%</div>
+          <small>vs last week</small>
+        </div>
+
+      </div>
+
+
+      <!-- MIDDLE -->
+      <div class="middle-grid">
+
+        <!-- TRACKING -->
+        <div class="card">
+
+          <div class="card-header">
+            <span>📍 Live Tracking</span>
+            <a>View All →</a>
+          </div>
+
+          <div class="map">
+
+            <div class="location delhi">
+              <div class="pin">📍</div>
+              Delhi
+            </div>
+
+            <div class="vehicle">🚚</div>
+
+            <div class="location jaipur">
+              <div class="pin red">📍</div>
+              Jaipur
+            </div>
+
+          </div>
+
+          <div class="tracking-info">
+
+            <p>🚚 Vehicle No. <strong>HR26BX4587</strong></p>
+            <p>📍 From <strong>Delhi</strong></p>
+            <p>📍 To <strong>Jaipur</strong></p>
+            <p>◷ ETA <strong>3h 20m</strong></p>
+            <p>♡ Distance <strong>286 km</strong></p>
+            <p>♟ Driver <strong>Rajesh Kumar</strong></p>
+
+            <button class="btn" onclick="trackVehicle()">
+              📍 Track Live
+            </button>
+
+          </div>
+        </div>
+
+
+        <!-- SHIPMENT STATUS -->
+        <div class="card">
+
+          <div class="card-header">
+            <span>▥ Shipment Status</span>
+          </div>
+
+          <div class="donut-area">
+
+            <div class="donut"></div>
+
+            <div class="legend">
+              <div><span class="dot" style="background:#08a75a"></span>Booked &nbsp;28 (22%)</div>
+              <div><span class="dot" style="background:#087cf0"></span>Picked Up &nbsp;22 (18%)</div>
+              <div><span class="dot" style="background:#f59e0b"></span>In Transit &nbsp;38 (30%)</div>
+              <div><span class="dot" style="background:#6946d8"></span>Delivered &nbsp;32 (26%)</div>
+              <div><span class="dot" style="background:#ef3348"></span>Delayed &nbsp;5 (4%)</div>
+            </div>
+
+          </div>
+
+        </div>
+
+
+        <!-- RECENT SHIPMENTS -->
+        <div class="card">
+
+          <div class="card-header">
+            <span>🚚 Recent Shipments</span>
+            <a>View All →</a>
+          </div>
+
+          <table>
+
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>From → To</th>
+                <th>Status</th>
+                <th>ETA</th>
+              </tr>
+            </thead>
+
+            <tbody>
+              <tr>
+                <td>SHP001</td>
+                <td>Ludhiana → Delhi</td>
+                <td><span class="status transit">In Transit</span></td>
+                <td>12 Aug 2025</td>
+              </tr>
+
+              <tr>
+                <td>SHP002</td>
+                <td>Chandigarh → Jaipur</td>
+                <td><span class="status picked">Picked Up</span></td>
+                <td>11 Aug 2025</td>
+              </tr>
+
+              <tr>
+                <td>SHP003</td>
+                <td>Delhi → Mumbai</td>
+                <td><span class="status delivered">Delivered</span></td>
+                <td>10 Aug 2025</td>
+              </tr>
+
+              <tr>
+                <td>SHP004</td>
+                <td>Kanpur → Patna</td>
+                <td><span class="status delayed">Delayed</span></td>
+                <td>09 Aug 2025</td>
+              </tr>
+
+              <tr>
+                <td>SHP005</td>
+                <td>Amritsar → Bangalore</td>
+                <td><span class="status transit">In Transit</span></td>
+                <td>13 Aug 2025</td>
+              </tr>
+            </tbody>
+
+          </table>
+
+        </div>
+
+      </div>
+
+
+      <!-- LOWER SECTION -->
+      <div class="lower-grid">
+
+        <!-- VEHICLES -->
+        <div class="card table-card">
+
+          <div class="card-header">
+            <span>🚚 Recent Vehicles</span>
+            <a>View All →</a>
+          </div>
+
+          <table>
+            <thead>
+              <tr>
+                <th>Vehicle No.</th>
+                <th>Type</th>
+                <th>Capacity</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+
+            <tbody>
+              <tr>
+                <td>HR26BX4587</td>
+                <td>Truck</td>
+                <td>15 MT</td>
+                <td><span class="status picked">Available</span></td>
+              </tr>
+
+              <tr>
+                <td>PB10CD1234</td>
+                <td>Container</td>
+                <td>25 MT</td>
+                <td><span class="status transit">On Trip</span></td>
+              </tr>
+
+              <tr>
+                <td>UP32KL5678</td>
+                <td>Tata Ace</td>
+                <td>5 MT</td>
+                <td><span class="status picked">Available</span></td>
+              </tr>
+
+              <tr>
+                <td>RJ14GH9012</td>
+                <td>Truck</td>
+                <td>12 MT</td>
+                <td><span class="status" style="background:#fff0c7;color:#d68700">Maintenance</span></td>
+              </tr>
+
+              <tr>
+                <td>DL8CAB6789</td>
+                <td>Container</td>
+                <td>20 MT</td>
+                <td><span class="status transit">On Trip</span></td>
+              </tr>
+            </tbody>
+
+          </table>
+
+        </div>
+
+
+        <!-- ROUTE -->
+        <div class="card">
+
+          <div class="card-header">
+            <span>🗺 Route Optimization</span>
+            <a>View Route →</a>
+          </div>
+
+          <div class="route-content">
+
+            <div class="route-details">
+
+              <h3>Delhi → Jaipur</h3>
+
+              <p>
+                Distance
+                <strong>286 km</strong>
+              </p>
+
+              <p>
+                Estimated Time
+                <strong>3h 20m</strong>
+              </p>
+
+              <p>
+                Fuel Cost (est.)
+                <strong>₹2,480</strong>
+              </p>
+
+              <p>
+                Best Route
+                <span class="optimized">Via NH48 (Optimized)</span>
+              </p>
+
+            </div>
+
+            <div class="map">
+              <div class="location delhi">
+                📍
+              </div>
+              <div class="vehicle">🚚</div>
+              <div class="location jaipur">
+                📍
+              </div>
+            </div>
+
+          </div>
+
+        </div>
+
+
+        <!-- DELIVERY -->
+        <div class="card">
+
+          <div class="card-header">
+            <span>🚚 Delivery Progress</span>
+            <a>View All →</a>
+          </div>
+
+          <div class="delivery">
+
+            <div class="timeline">
+
+              <div class="timeline-item">
+                <h4>Booked</h4>
+                <p>08 Aug 2025, 10:15 AM</p>
+                <p>Shipment created successfully</p>
+              </div>
+
+              <div class="timeline-item">
+                <h4>Picked Up</h4>
+                <p>09 Aug 2025, 09:20 AM</p>
+                <p>Goods picked from warehouse</p>
+              </div>
+
+              <div class="timeline-item">
+                <h4>In Transit</h4>
+                <p>10 Aug 2025, 04:30 PM</p>
+                <p>On the way to destination</p>
+              </div>
+
+              <div class="timeline-item pending">
+                <h4>Delivered</h4>
+                <p>Awaiting delivery</p>
+              </div>
+
+            </div>
+
+            <div class="on-time">
+              <div class="big-truck">🚛</div>
+              On Time
+              <br>
+              Every Time
+              <div class="line" style="margin:auto;margin-top:12px"></div>
+            </div>
+
+          </div>
+
+        </div>
+
+      </div>
+
+
+      <!-- WORKFLOW -->
+      <div class="card workflow-card">
+
+        <div class="card-header">
+          <span>⚙ Workflow</span>
+        </div>
+
+        <div class="workflow">
+
+          <div class="step">
+            <div class="step-icon">👤</div>
+            <p>Customer</p>
+          </div>
+
+          <div class="step">
+            <div class="step-icon">📄</div>
+            <p>Shipment<br>Booking</p>
+          </div>
+
+          <div class="step">
+            <div class="step-icon">🏭</div>
+            <p>Warehouse</p>
+          </div>
+
+          <div class="step">
+            <div class="step-icon">🚚</div>
+            <p>Vehicle<br>Assignment</p>
+          </div>
+
+          <div class="step">
+            <div class="step-icon">📍</div>
+            <p>Route<br>Optimization</p>
+          </div>
+
+          <div class="step">
+            <div class="step-icon">◎</div>
+            <p>Live<br>Tracking</p>
+          </div>
+
+          <div class="step">
+            <div class="step-icon">✓</div>
+            <p>Confirmation</p>
+          </div>
+
+          <div class="step">
+            <div class="step-icon">▥</div>
+            <p>Report</p>
+          </div>
+
+        </div>
+
+      </div>
+
+
+      <!-- FEATURES -->
+      <div class="card">
+
+        <div class="card-header">
+          <span>★ Key Features</span>
+        </div>
+
+        <div class="features">
+
+          <div class="feature-list">
+
+            <div>Real-time vehicle tracking</div>
+            <div>Shipment & delivery status</div>
+
+            <div>Optimized route planning</div>
+            <div>Cost and fuel tracking</div>
+
+            <div>Efficient vehicle & driver management</div>
+            <div>Performance reports</div>
+
+            <div>Fleet management</div>
+            <div>Easy & user-friendly interface</div>
+
+          </div>
+
+        </div>
+
+      </div>
+
+    </section>
+
+  </main>
+
+</div>
+
+
+<script>
+
+  // Track vehicle button
+  function trackVehicle() {
+    alert(
+      "Live Tracking Started\n\n" +
+      "Vehicle: HR26BX4587\n" +
+      "Route: Delhi → Jaipur\n" +
+      "ETA: 3h 20m"
+    );
+  }
+
+  // Sidebar navigation
+  const menuLinks = document.querySelectorAll(".menu a");
+
+  menuLinks.forEach(link => {
+
+    link.addEventListener("click", function() {
+
+      menuLinks.forEach(item => {
+        item.classList.remove("active");
+      });
+
+      this.classList.add("active");
+
+      const page = this.innerText.trim();
+
+      if (page !== "Dashboard") {
+        alert(page + " module selected.");
+      }
+
+    });
+
+  });
+
+  // Search
+  const search = document.querySelector(".search");
+
+  search.addEventListener("keyup", function() {
+
+    const value = this.value.toLowerCase();
+
+    const rows = document.querySelectorAll("tbody tr");
+
+    rows.forEach(row => {
+
+      row.style.display =
+        row.innerText.toLowerCase().includes(value)
+          ? ""
+          : "none";
+
+    });
+
+  });
+
+</script>
+
+</body>
+</html>

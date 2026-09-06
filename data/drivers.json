@@ -1,0 +1,32 @@
+[
+  {
+    "driver_id": "DRV001",
+    "name": "Rajesh Kumar",
+    "phone": "+91 9876543212",
+    "email": "driver@apexflow.com",
+    "license_number": "DL-1420110098",
+    "assigned_vehicle": "HR26BX4587",
+    "status": "Available",
+    "rating": 4.9
+  },
+  {
+    "driver_id": "DRV002",
+    "name": "Sukhwinder Singh",
+    "phone": "+91 9876543222",
+    "email": "sukhwinder@apexflow.com",
+    "license_number": "PB-0820150042",
+    "assigned_vehicle": "PB10CD1234",
+    "status": "On Trip",
+    "rating": 4.8
+  },
+  {
+    "driver_id": "DRV003",
+    "name": "Vikram Yadav",
+    "phone": "+91 9876543233",
+    "email": "vikram@apexflow.com",
+    "license_number": "UP-3220180076",
+    "assigned_vehicle": "UP32KL5678",
+    "status": "Available",
+    "rating": 4.7
+  }
+]

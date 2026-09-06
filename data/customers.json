@@ -1,0 +1,22 @@
+[
+  {
+    "customer_id": "CUST001",
+    "company": "ABC Industries",
+    "name": "ABC Group Ltd",
+    "phone": "+91 9811223344",
+    "email": "contact@abcind.com",
+    "address": "GT Road, Ludhiana, Punjab",
+    "total_shipments": 12,
+    "total_spent": 142000.0
+  },
+  {
+    "customer_id": "CUST002",
+    "company": "Zenith Electronics",
+    "name": "Zenith Tech Corp",
+    "phone": "+91 9822334455",
+    "email": "logistics@zenith.com",
+    "address": "Sector 18, Gurgaon, Haryana",
+    "total_shipments": 8,
+    "total_spent": 98500.0
+  }
+]

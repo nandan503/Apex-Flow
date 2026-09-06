@@ -1,0 +1,95 @@
+/* Form Styles */
+.form-group {
+  margin-bottom: 16px;
+}
+
+.form-group label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-main);
+  margin-bottom: 6px;
+}
+
+.form-control,
+.form-select {
+  width: 100%;
+  padding: 10px 14px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  font-size: 13.5px;
+  color: var(--text-main);
+  background-color: #ffffff;
+  outline: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.form-control:focus,
+.form-select:focus {
+  border-color: var(--accent-blue);
+  box-shadow: 0 0 0 3px rgba(7, 137, 255, 0.15);
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+}
+
+textarea.form-control {
+  resize: vertical;
+  min-height: 80px;
+}
+
+.login-card {
+  width: 100%;
+  max-width: 440px;
+  margin: 60px auto;
+  background: white;
+  padding: 36px;
+  border-radius: var(--radius-lg);
+  box-shadow: 0 10px 30px rgba(6, 43, 87, 0.12);
+  border: 1px solid var(--border-color);
+}
+
+.login-header {
+  text-align: center;
+  margin-bottom: 28px;
+}
+
+.login-header h2 {
+  font-size: 26px;
+  color: var(--primary-navy);
+  font-weight: 800;
+}
+
+.demo-roles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 20px;
+  margin-bottom: 24px;
+  padding: 14px;
+  background: var(--light-blue);
+  border-radius: var(--radius-md);
+}
+
+.demo-role-btn {
+  flex: 1;
+  min-width: 90px;
+  padding: 8px 10px;
+  background: white;
+  border: 1px solid #cbe2fc;
+  border-radius: var(--radius-sm);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--primary-navy);
+  cursor: pointer;
+  text-align: center;
+  transition: all 0.2s ease;
+}
+
+.demo-role-btn:hover {
+  background: var(--accent-blue);
+  color: white;
+}

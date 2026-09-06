@@ -1,0 +1,194 @@
+/* Dashboard Specific Styles */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 18px;
+  margin-bottom: 24px;
+}
+
+.stat-card {
+  padding: 22px;
+  border-radius: var(--radius-md);
+  color: #ffffff;
+  position: relative;
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.stat-card:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-md);
+}
+
+.stat-card.blue { background: linear-gradient(135deg, #087cf0, #0a9bff); }
+.stat-card.green { background: linear-gradient(135deg, #08a75a, #16c979); }
+.stat-card.purple { background: linear-gradient(135deg, #6946d8, #895be9); }
+.stat-card.red { background: linear-gradient(135deg, #ef3348, #ff5362); }
+.stat-card.dark { background: linear-gradient(135deg, #062b57, #134b8c); }
+
+.stat-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.stat-top h3 {
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  opacity: 0.9;
+}
+
+.stat-icon {
+  font-size: 26px;
+}
+
+.stat-number {
+  font-size: 32px;
+  font-weight: 800;
+  margin: 12px 0 4px;
+}
+
+.stat-sub {
+  font-size: 12px;
+  opacity: 0.85;
+}
+
+/* MIDDLE DASHBOARD GRID */
+.middle-grid {
+  display: grid;
+  grid-template-columns: 1.35fr 0.95fr 1.1fr;
+  gap: 18px;
+  margin-bottom: 20px;
+}
+
+/* MAP CONTAINER */
+.map-container {
+  height: 240px;
+  position: relative;
+  background: linear-gradient(120deg, #e9f1df 45%, #d8e6d1 50%, #c8d7e5 55%);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  border: 1px solid var(--border-color);
+}
+
+.map-route-line {
+  position: absolute;
+  width: 75%;
+  height: 4px;
+  background: var(--accent-blue);
+  transform: rotate(28deg);
+  top: 110px;
+  left: 45px;
+  border-radius: 10px;
+  box-shadow: 0 0 8px rgba(7, 137, 255, 0.6);
+}
+
+.map-pin {
+  position: absolute;
+  font-size: 22px;
+  font-weight: 800;
+}
+
+.map-pin.delhi { top: 25px; left: 55px; color: var(--success); }
+.map-pin.jaipur { bottom: 30px; right: 50px; color: var(--danger); }
+
+.map-vehicle-marker {
+  position: absolute;
+  top: 98px;
+  left: 46%;
+  font-size: 28px;
+  animation: moveVehicle 3s infinite alternate ease-in-out;
+}
+
+@keyframes moveVehicle {
+  0% { transform: translate(-10px, -5px); }
+  100% { transform: translate(15px, 8px); }
+}
+
+.tracking-details {
+  padding: 14px 16px;
+  font-size: 13px;
+}
+
+.tracking-details p {
+  display: flex;
+  justify-content: space-between;
+  margin: 8px 0;
+  color: var(--text-muted);
+}
+
+.tracking-details strong {
+  color: var(--text-main);
+}
+
+/* CHARTS AREA */
+.chart-container {
+  height: 220px;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.donut-chart-wrap {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.donut-graphic {
+  width: 130px;
+  height: 130px;
+  border-radius: 50%;
+  background: conic-gradient(
+    #08a75a 0% 25%,
+    #087cf0 25% 45%,
+    #f59e0b 45% 70%,
+    #6946d8 70% 95%,
+    #ef3348 95% 100%
+  );
+  position: relative;
+  flex-shrink: 0;
+}
+
+.donut-graphic::after {
+  content: "125\A Shipments";
+  white-space: pre;
+  position: absolute;
+  inset: 26px;
+  background: white;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  font-weight: 700;
+  font-size: 13px;
+}
+
+.chart-legend {
+  font-size: 12px;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 6px 0;
+}
+
+.legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+/* LOWER GRID */
+.lower-grid {
+  display: grid;
+  grid-template-columns: 1.1fr 0.9fr 1fr;
+  gap: 18px;
+}
