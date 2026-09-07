@@ -22,18 +22,16 @@ function renderVehiclesTable(vehicles) {
 
   tbody.innerHTML = vehicles.map(v => `
     <tr>
-      <td><strong>${v.vehicle_id}</strong></td>
-      <td><strong>${v.registration_number}</strong></td>
-      <td>${v.vehicle_type}</td>
-      <td>${v.make} ${v.model} (${v.year})</td>
-      <td>${v.capacity_mt} MT</td>
-      <td>${v.fuel_type}</td>
-      <td>📍 ${v.current_location}</td>
-      <td>${v.service_due_date}</td>
-      <td><span class="badge badge-${v.status.toLowerCase().replace(/\s+/g, '-')}">${v.status}</span></td>
-      <td>
-        <button class="btn-icon" onclick="showToast('Assigned driver logic updated for ${v.registration_number}', 'info')">👤</button>
-      </td>
+      <td><strong>${escapeHtml(v.vehicle_id)}</strong></td>
+      <td><strong>${escapeHtml(v.registration_number)}</strong></td>
+      <td>${escapeHtml(v.vehicle_type)}</td>
+      <td>${escapeHtml(v.make)} ${escapeHtml(v.model)} (${escapeHtml(v.year)})</td>
+      <td>${escapeHtml(v.capacity_mt)} MT</td>
+      <td>${escapeHtml(v.fuel_type)}</td>
+      <td>📍 ${escapeHtml(v.current_location)}</td>
+      <td>${escapeHtml(v.service_due_date)}</td>
+      <td><span class="badge badge-${statusClass(v.status)}">${escapeHtml(v.status)}</span></td>
+      <td></td>
     </tr>
   `).join('');
 }
@@ -48,8 +46,7 @@ async function handleAddVehicleSubmit(event) {
     model: document.getElementById('vehModel').value,
     capacity_mt: parseFloat(document.getElementById('vehCapacity').value) || 15,
     fuel_type: document.getElementById('vehFuelType').value,
-    current_location: document.getElementById('vehLocation').value,
-    status: document.getElementById('vehStatus').value
+    current_location: document.getElementById('vehLocation').value
   };
 
   try {
@@ -64,9 +61,7 @@ async function handleAddVehicleSubmit(event) {
       document.getElementById('addVehicleForm').reset();
       loadVehicles();
     }
-  } catch (err) {
-    // Handled by fetchAPI toast
-  }
+  } catch (err) {}
 }
 
 document.addEventListener('DOMContentLoaded', () => {

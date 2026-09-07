@@ -4,7 +4,7 @@ let currentReportData = [];
 
 async function generateReport(type = 'shipments') {
   try {
-    const res = await fetchAPI(`/reports/${type}`);
+    const res = await fetchAPI(`/reports/${encodeURIComponent(type)}`);
     if (res.success && res.data) {
       currentReportData = res.data;
       renderReportTable(currentReportData);
@@ -17,16 +17,35 @@ function renderReportTable(data) {
   const table = document.getElementById('reportOutputTable');
   if (!table) return;
 
+  table.textContent = '';
   if (!data || data.length === 0) {
     table.innerHTML = `<thead><tr><th>Data</th></tr></thead><tbody><tr><td>No data available for this report type</td></tr></tbody>`;
     return;
   }
 
   const keys = Object.keys(data[0]);
-  const theadHtml = `<thead><tr>${keys.map(k => `<th>${k.replace('_', ' ').toUpperCase()}</th>`).join('')}</tr></thead>`;
-  const tbodyHtml = `<tbody>${data.map(row => `<tr>${keys.map(k => `<td>${row[k] !== null ? row[k] : ''}</td>`).join('')}</tr>`).join('')}</tbody>`;
+  const thead = document.createElement('thead');
+  const hr = document.createElement('tr');
+  keys.forEach(k => {
+    const th = document.createElement('th');
+    th.textContent = k.replace('_', ' ').toUpperCase();
+    hr.appendChild(th);
+  });
+  thead.appendChild(hr);
 
-  table.innerHTML = theadHtml + tbodyHtml;
+  const tbody = document.createElement('tbody');
+  data.forEach(row => {
+    const tr = document.createElement('tr');
+    keys.forEach(k => {
+      const td = document.createElement('td');
+      td.textContent = row[k] !== null && row[k] !== undefined ? row[k] : '';
+      tr.appendChild(td);
+    });
+    tbody.appendChild(tr);
+  });
+
+  table.appendChild(thead);
+  table.appendChild(tbody);
 }
 
 function exportReportJSON() {
@@ -51,7 +70,7 @@ function exportReportCSV() {
   const keys = Object.keys(currentReportData[0]);
   let csv = keys.join(',') + '\n';
   currentReportData.forEach(row => {
-    csv += keys.map(k => `"${row[k] || ''}"`).join(',') + '\n';
+    csv += keys.map(k => `"${String(row[k] ?? '').replace(/"/g, '""')}"`).join(',') + '\n';
   });
 
   const blob = new Blob([csv], { type: 'text/csv' });

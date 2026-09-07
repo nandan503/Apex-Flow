@@ -14,27 +14,68 @@ function renderNotificationsList(notifs) {
   if (!container) return;
 
   if (!notifs || notifs.length === 0) {
-    container.innerHTML = `<div style="text-align:center; padding:30px; color:var(--text-muted);">No notifications</div>`;
+    container.textContent = '';
+    const empty = document.createElement('div');
+    empty.style.textAlign = 'center';
+    empty.style.padding = '30px';
+    empty.style.color = 'var(--text-muted)';
+    empty.textContent = 'No notifications';
+    container.appendChild(empty);
     return;
   }
 
-  container.innerHTML = notifs.map(n => `
-    <div class="card" style="padding:16px; margin-bottom:12px; border-left: 4px solid var(--${n.type === 'danger' ? 'danger' : (n.type === 'warning' ? 'warning' : 'accent-blue')}); opacity: ${n.is_read ? 0.75 : 1};">
-      <div style="display:flex; justify-content:space-between; align-items:center;">
-        <h4 style="font-size:14px; font-weight:700; color:var(--primary-navy);">${n.title}</h4>
-        <span style="font-size:11px; color:var(--text-muted);">${n.timestamp}</span>
-      </div>
-      <p style="font-size:13px; color:var(--text-main); margin-top:6px;">${n.message}</p>
-      ${!n.is_read ? `
-        <button class="btn btn-sm btn-secondary" style="margin-top:10px;" onclick="markSingleRead('${n.notification_id}')">Mark as Read</button>
-      ` : `<span style="font-size:11px; color:var(--success); margin-top:8px; display:inline-block;">✓ Read</span>`}
-    </div>
-  `).join('');
+  container.textContent = '';
+  notifs.forEach(n => {
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.style.padding = '16px';
+    card.style.marginBottom = '12px';
+    card.style.opacity = n.is_read ? 0.75 : 1;
+
+    const row = document.createElement('div');
+    row.style.display = 'flex';
+    row.style.justifyContent = 'space-between';
+    row.style.alignItems = 'center';
+
+    const title = document.createElement('h4');
+    title.style.fontSize = '14px';
+    title.style.fontWeight = '700';
+    title.style.color = 'var(--primary-navy)';
+    title.textContent = n.title;
+
+    const ts = document.createElement('span');
+    ts.style.fontSize = '11px';
+    ts.style.color = 'var(--text-muted)';
+    ts.textContent = n.timestamp;
+
+    row.appendChild(title);
+    row.appendChild(ts);
+
+    const msg = document.createElement('p');
+    msg.style.fontSize = '13px';
+    msg.style.color = 'var(--text-main)';
+    msg.style.marginTop = '6px';
+    msg.textContent = n.message;
+
+    card.appendChild(row);
+    card.appendChild(msg);
+
+    if (!n.is_read) {
+      const btn = document.createElement('button');
+      btn.className = 'btn btn-sm btn-secondary';
+      btn.style.marginTop = '10px';
+      btn.textContent = 'Mark as Read';
+      btn.addEventListener('click', () => markSingleRead(n.notification_id));
+      card.appendChild(btn);
+    }
+
+    container.appendChild(card);
+  });
 }
 
 async function markSingleRead(notifId) {
   try {
-    const res = await fetchAPI(`/notifications/${notifId}/read`, { method: 'PUT' });
+    const res = await fetchAPI(`/notifications/${encodeURIComponent(notifId)}/read`, { method: 'PUT' });
     if (res.success) {
       loadNotificationsPage();
       loadNotificationBadge();

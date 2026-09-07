@@ -22,14 +22,14 @@ function renderCustomersTable(customers) {
 
   tbody.innerHTML = customers.map(c => `
     <tr>
-      <td><strong>${c.customer_id}</strong></td>
-      <td><strong>${c.company}</strong></td>
-      <td>${c.name}</td>
-      <td>${c.phone}</td>
-      <td>${c.email}</td>
-      <td>${c.address}</td>
-      <td>${c.total_shipments}</td>
-      <td><strong>₹${c.total_spent.toLocaleString()}</strong></td>
+      <td><strong>${escapeHtml(c.customer_id)}</strong></td>
+      <td><strong>${escapeHtml(c.company)}</strong></td>
+      <td>${escapeHtml(c.name)}</td>
+      <td>${escapeHtml(c.phone)}</td>
+      <td>${escapeHtml(c.email)}</td>
+      <td>${escapeHtml(c.address || '')}</td>
+      <td>${escapeHtml(c.total_shipments)}</td>
+      <td><strong>₹${Number(c.total_spent || 0).toLocaleString()}</strong></td>
     </tr>
   `).join('');
 }

@@ -22,18 +22,16 @@ function renderDriversTable(drivers) {
 
   tbody.innerHTML = drivers.map(d => `
     <tr>
-      <td><strong>${d.driver_id}</strong></td>
-      <td><strong>${d.name}</strong></td>
-      <td>${d.phone}</td>
-      <td>${d.license_number}</td>
-      <td>${d.license_expiry}</td>
-      <td>${d.experience_years} yrs</td>
-      <td>${d.total_trips} trips (${d.completed_trips} completed)</td>
-      <td>⭐ ${d.rating}</td>
-      <td><span class="badge badge-${d.status.toLowerCase().replace(/\s+/g, '-')}">${d.status}</span></td>
-      <td>
-        <button class="btn-icon" onclick="showToast('Driver ${d.name} details loaded', 'info')">👁</button>
-      </td>
+      <td><strong>${escapeHtml(d.driver_id)}</strong></td>
+      <td><strong>${escapeHtml(d.name)}</strong></td>
+      <td>${escapeHtml(d.phone)}</td>
+      <td>${escapeHtml(d.license_number)}</td>
+      <td>${escapeHtml(d.license_expiry)}</td>
+      <td>${escapeHtml(d.experience_years)} yrs</td>
+      <td>${escapeHtml(d.total_trips)} trips (${escapeHtml(d.completed_trips)} completed)</td>
+      <td>⭐ ${escapeHtml(d.rating)}</td>
+      <td><span class="badge badge-${statusClass(d.status)}">${escapeHtml(d.status)}</span></td>
+      <td></td>
     </tr>
   `).join('');
 }
@@ -46,8 +44,7 @@ async function handleAddDriverSubmit(event) {
     phone: document.getElementById('driverPhone').value,
     email: document.getElementById('driverEmail').value,
     license_number: document.getElementById('driverLicense').value,
-    experience_years: parseInt(document.getElementById('driverExperience').value) || 5,
-    status: document.getElementById('driverStatus').value
+    experience_years: parseInt(document.getElementById('driverExperience').value, 10) || 5
   };
 
   try {
@@ -62,9 +59,7 @@ async function handleAddDriverSubmit(event) {
       document.getElementById('addDriverForm').reset();
       loadDrivers();
     }
-  } catch (err) {
-    // Handled by fetchAPI toast
-  }
+  } catch (err) {}
 }
 
 document.addEventListener('DOMContentLoaded', () => {
