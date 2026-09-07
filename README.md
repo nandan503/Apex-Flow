@@ -1,242 +1,381 @@
-# 🚀 APEX FLOW - Smart Transport & Logistics System
-> **Tagline:** *"Smarter Logistics. Faster Tomorrow."*
+# 🚀 APEX FLOW — Smart Transport & Logistics System
 
-APEX FLOW is an enterprise-grade, cross-device accessible transport and fleet management web application. Designed for seamless operation on **Android phones, iPhones, iPads, Tablets, Windows PCs, MacBooks, and Linux PCs**, APEX FLOW adapts dynamically to any screen resolution without depending on a personal computer's `localhost`.
+> *Smarter Logistics. Faster Tomorrow.*
 
----
-
-## 🌟 Key Features & Cross-Device Compatibility
-
-- **Universal Accessibility**: Accessible via standard web browsers across mobile phones, tablets, laptops, and desktop computers.
-- **Mobile Responsive UI**:
-  - Auto-collapsing slide-out drawer navigation (Hamburger menu) for touch screens (`< 850px`).
-  - Adaptive 1 to 4-column dashboard KPI cards grid.
-  - Horizontally scrollable data tables (`.table-responsive`) with zero page overflow.
-  - 44px+ touch-friendly tap targets for buttons, inputs, and modals.
-- **Production Dual Database Engine**:
-  - Zero-config **SQLite** for instant local development.
-  - Cloud-ready **PostgreSQL** compatibility for online multi-device synchronization.
-- **RESTful API Backend**: Built with Python Flask, providing structured JSON REST endpoints for auth, shipments, vehicles, drivers, tracking, routes, reports, and notifications.
+[![Python](https://img.shields.io/badge/Python-3.10+-3776AB?logo=python&logoColor=white)](https://python.org)
+[![Flask](https://img.shields.io/badge/Flask-2.3+-000000?logo=flask&logoColor=white)](https://flask.palletsprojects.com)
+[![SQLite](https://img.shields.io/badge/SQLite-dev-003B57?logo=sqlite&logoColor=white)](https://sqlite.org)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-prod-336791?logo=postgresql&logoColor=white)](https://postgresql.org)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 ---
 
-## 🛠️ Tech Stack
+## 📋 Table of Contents
 
-- **Frontend**: HTML5, Vanilla CSS3 (CSS Variables, Flexbox, Grid, Media Queries), Vanilla JavaScript (ES6+ fetch API).
-- **Backend**: Python 3.9+ Flask, Gunicorn WSGI Server, Flask-CORS, Werkzeug.
-- **Database Engine**: Dual SQLite / PostgreSQL abstraction layer (`backend/database.py`).
+- [Overview](#-overview)
+- [Features](#-features)
+- [Architecture](#-architecture)
+- [Quick Start (Local)](#-quick-start-local)
+- [Environment Variables](#-environment-variables)
+- [Deployment](#-deployment-render--railway)
+- [API Reference](#-api-reference)
+- [User Roles](#-user-roles)
+- [Security](#-security)
+- [Project Structure](#-project-structure)
+- [Contributing](#-contributing)
 
 ---
 
-## 💻 1. Local Installation
+## 🌐 Overview
 
-Follow these steps to set up and run APEX FLOW on your local computer:
+APEX FLOW is a full-stack **Transport & Logistics Management System** built with:
+
+- **Frontend**: HTML5 · CSS3 · Vanilla JavaScript (responsive, mobile-first)
+- **Backend**: Python Flask REST API
+- **Database**: SQLite (development) / PostgreSQL (production)
+- **Deployment**: Render / Railway (Procfile-ready)
+
+The system manages the complete logistics lifecycle — from shipment booking and vehicle fleet management to live GPS tracking, OTP-verified delivery confirmation, and analytics dashboards — all accessible from **any device** via a public HTTPS URL.
+
+---
+
+## ✨ Features
+
+| Module | Description |
+|---|---|
+| 🔐 **Authentication** | Session-based login with role-based access control (RBAC) |
+| 📦 **Shipments** | Book, track, update, and cancel shipments end-to-end |
+| 🚛 **Fleet Management** | Manage vehicles with status, compliance, and assignment tracking |
+| 👨‍✈️ **Drivers** | Driver profiles, license tracking, trip history, and ratings |
+| 👥 **Customers** | Customer accounts with shipment history and spend tracking |
+| 🗺️ **Live Tracking** | Real-time GPS simulation with ETA and speed telemetry |
+| 📍 **Route Optimization** | Calculate optimal routes with fuel cost estimation |
+| 🏭 **Warehouses** | Warehouse locations and capacity management |
+| 📬 **Delivery OTP** | CSPRNG 6-digit OTP with 5-attempt lockout and 30-min expiry |
+| 💳 **Payments** | Invoice and payment record management |
+| 📊 **Reports & KPIs** | Dashboard KPIs — revenue, fleet utilization, delivery rates |
+| 🔔 **Notifications** | System-wide notification feed with read/unread state |
+
+---
+
+## 🏗️ Architecture
+
+```
+apex-flow/
+├── backend/               # Flask REST API
+│   ├── app.py             # WSGI entry point, CORS, rate-limiter, session config
+│   ├── routes.py          # All API endpoints (Blueprint)
+│   ├── auth.py            # @login_required / @require_role decorators
+│   ├── services.py        # Business logic layer
+│   ├── database.py        # SQLite & PostgreSQL dual-engine with schema
+│   ├── tracking.py        # Live GPS simulation engine
+│   ├── reports.py         # KPI aggregations and analytics queries
+│   ├── logger.py          # Structured security event logger (PII-redacted)
+│   ├── models.py          # Row-to-dict helpers
+│   ├── utils.py           # JSON response helpers
+│   └── config.py          # Environment-driven configuration
+├── frontend/              # Static HTML5/CSS3/JS pages
+│   ├── login.html         # Authentication page
+│   ├── dashboard.html     # KPI overview
+│   ├── shipments.html     # Shipment management
+│   ├── tracking.html      # Live GPS tracking map
+│   ├── vehicles.html      # Fleet management
+│   ├── drivers.html       # Driver management
+│   ├── customers.html     # Customer management
+│   ├── routes.html        # Route optimization
+│   ├── deliveries.html    # OTP delivery confirmation
+│   ├── payments.html      # Payment records
+│   ├── reports.html       # Analytics reports
+│   ├── notifications.html # Notification center
+│   ├── warehouses.html    # Warehouse directory
+│   └── settings.html      # App settings
+├── data/                  # Seed JSON data files
+├── .env.example           # Environment variable template
+├── requirements.txt       # Python dependencies
+└── Procfile               # Gunicorn deployment config
+```
+
+---
+
+## ⚡ Quick Start (Local)
+
+### Prerequisites
+
+- Python 3.10+
+- pip
+
+### 1. Clone the repository
 
 ```bash
-# 1. Clone the repository or navigate to project folder
-cd /path/to/HImanshu
+git clone https://github.com/nandan503/Apex-Flow.git
+cd Apex-Flow
+```
 
-# 2. Create a virtual environment
+### 2. Create and activate a virtual environment
+
+```bash
 python3 -m venv venv
+source venv/bin/activate        # macOS / Linux
+# venv\Scripts\activate         # Windows
+```
 
-# 3. Activate the virtual environment
-# On macOS / Linux:
-source venv/bin/activate
-# On Windows (Command Prompt):
-# venv\Scripts\activate.bat
-# On Windows (PowerShell):
-# .\venv\Scripts\Activate.ps1
+### 3. Install dependencies
 
-# 4. Install production dependencies
+```bash
 pip install -r requirements.txt
 ```
 
----
-
-## 🧪 2. Local Testing
-
-To run the application locally for testing:
+### 4. Configure environment variables
 
 ```bash
-python backend/app.py
+cp .env.example .env
+# Edit .env and set your values — see Environment Variables section below
 ```
 
-Output:
-```
-============================================================
-  🚀 APEX FLOW - Smart Transport & Logistics System
-  Tagline: 'Smarter Logistics. Faster Tomorrow.'
-============================================================
-  Server Running on host 0.0.0.0 port 5050
-============================================================
+### 5. Run the development server
+
+```bash
+python3 backend/app.py
 ```
 
-Open your browser and navigate to: `http://localhost:5050` or `http://127.0.0.1:5050`.
+The app will be available at **http://localhost:5050**
 
-### 🔑 Demo Login Credentials:
+### Default Login Credentials (Development Only)
 
-| Role | Email | Password |
-| :--- | :--- | :--- |
-| **System Admin** | `admin@apexflow.com` | `Admin@123` |
-| **Logistics Manager** | `manager@apexflow.com` | `Manager@123` |
-| **Driver** | `driver@apexflow.com` | `Driver@123` |
-| **Customer** | `customer@apexflow.com` | `Customer@123` |
+> ⚠️ Change these immediately in any non-local environment via the `SEED_*_PASSWORD` env vars.
+
+| Role | Email | Password (env var) |
+|---|---|---|
+| Admin | admin@apexflow.com | `SEED_ADMIN_PASSWORD` |
+| Manager | manager@apexflow.com | `SEED_MANAGER_PASSWORD` |
+| Driver | driver@apexflow.com | `SEED_DRIVER_PASSWORD` |
+| Customer | customer@apexflow.com | `SEED_CUSTOMER_PASSWORD` |
 
 ---
 
-## ⚙️ 3. Environment Variables Configuration
+## 🔧 Environment Variables
 
-APEX FLOW utilizes environment variables for production security and cloud deployment settings.
+Copy `.env.example` to `.env` and configure:
 
-Create a `.env` file in the root directory (refer to `.env.example`):
-
-```env
-# Server Binding
-PORT=5050
-HOST=0.0.0.0
-FLASK_ENV=production
-SECRET_KEY=your_super_secret_production_key_here
-
-# Database URL
-# SQLite Local (Default when empty):
-DATABASE_URL=
-# PostgreSQL Production (e.g. Render / Railway / Supabase / Neon / ElephantSQL):
-# DATABASE_URL=postgresql://username:password@ep-cloud-db.render.com:5432/apexflow_db
+```bash
+cp .env.example .env
 ```
 
+| Variable | Required | Description |
+|---|---|---|
+| `SECRET_KEY` | ✅ Production | Flask session signing key. Generate: `python3 -c "import secrets; print(secrets.token_hex(32))"` |
+| `FLASK_ENV` | ✅ Production | Set to `production` to enable all security hardening |
+| `DATABASE_URL` | ⬜ Optional | PostgreSQL URL. Omit to use SQLite locally |
+| `ALLOWED_ORIGINS` | ✅ Production | Comma-separated list of allowed frontend origins |
+| `REDIS_URL` | ⬜ Optional | Redis URL for distributed rate limiting. Omit for in-memory |
+| `HOST` | ⬜ Optional | Server bind host (default: `0.0.0.0`) |
+| `PORT` | ⬜ Optional | Server bind port (default: `5050`) |
+| `SEED_ADMIN_PASSWORD` | ✅ First run | Admin seed password for DB initialization |
+| `SEED_MANAGER_PASSWORD` | ✅ First run | Manager seed password |
+| `SEED_DRIVER_PASSWORD` | ✅ First run | Driver seed password |
+| `SEED_CUSTOMER_PASSWORD` | ✅ First run | Customer seed password |
+
 ---
 
-## 🗄️ 4. Database Configuration (SQLite vs PostgreSQL)
+## ☁️ Deployment (Render / Railway)
 
-APEX FLOW features an automatic dual-database engine in [backend/database.py](file:///Users/nandankumar/HImanshu/backend/database.py):
+### Deploy to Render (Recommended — Free tier available)
 
-- **Local SQLite**: Used automatically if `DATABASE_URL` is omitted. Stored in `data/apexflow.db`.
-- **Cloud PostgreSQL**: When deploying to production platforms (Render, Railway, Supabase, Neon, AWS RDS), set `DATABASE_URL` to your PostgreSQL URI. The application will automatically connect to PostgreSQL and create all required tables (`users`, `customers`, `vehicles`, `drivers`, `shipments`, `shipment_status_history`, `routes`, `warehouses`, `deliveries`, `payments`, `notifications`).
-
-Because the database resides on the cloud server, any record created on one device (e.g. creating shipment `SHP006` from an Android/iPhone) is immediately visible when opening APEX FLOW on any other device (PC, Laptop, Tablet).
-
----
-
-## 🌐 5. Production Deployment & Starting WSGI Server
-
-APEX FLOW includes a production-grade `Procfile` and `requirements.txt` ready for instant deployment to cloud platforms such as **Render**, **Railway**, **Fly.io**, **Koyeb**, **Heroku**, or a **VPS / Docker container**.
-
-### Option A: Deploying on Render (Free Public HTTPS URL)
-
-1. Push your repository to **GitHub / GitLab**.
-2. Log into [Render Dashboard](https://dashboard.render.com/) and click **New +** → **Web Service**.
-3. Connect your GitHub repository.
-4. Configure service settings:
-   - **Environment**: `Python 3`
+1. Push your code to GitHub.
+2. Go to [render.com](https://render.com) → **New Web Service**.
+3. Connect your `nandan503/Apex-Flow` repository.
+4. Configure:
    - **Build Command**: `pip install -r requirements.txt`
-   - **Start Command**: `gunicorn backend.app:app`
-5. Add Environment Variables under **Environment**:
-   - `FLASK_ENV` = `production`
-   - `SECRET_KEY` = *(your generated secret)*
-   - `DATABASE_URL` = *(Optional: PostgreSQL URL provided by Render Postgres or Supabase)*
-6. Click **Create Web Service**.
-7. Render will build and launch your application, providing a public HTTPS URL (e.g., `https://apex-flow.onrender.com`).
+   - **Start Command**: `gunicorn backend.app:app` *(auto-read from Procfile)*
+   - **Environment**: Python 3
+5. Add environment variables in the Render dashboard (see table above).
+6. Click **Deploy**.
 
-### Option B: Deploying on Railway
+Your app will be live at `https://apex-flow-xxxx.onrender.com` — accessible from **any device worldwide**.
 
-1. Go to [Railway.app](https://railway.app) and create a **New Project**.
-2. Select **Deploy from GitHub repo**.
-3. Railway automatically detects `requirements.txt` and `Procfile`.
-4. Add environment variables (`PORT`, `SECRET_KEY`, `DATABASE_URL`).
-5. Generate a public domain under **Settings** → **Networking** (e.g., `https://apex-flow.up.railway.app`).
-
-### Option C: Manual Production Launch via Gunicorn (Linux / VPS)
-
-To start the Flask production server manually on a VPS (e.g., DigitalOcean, AWS EC2, Linode):
+### Deploy to Railway
 
 ```bash
-gunicorn --bind 0.0.0.0:5050 backend.app:app --workers 4
+# Install Railway CLI
+npm install -g @railway/cli
+railway login
+railway init
+railway up
+```
+
+Set env vars in Railway dashboard or via `railway variables set KEY=value`.
+
+### Access from Any Device
+
+Once deployed to Render/Railway, open the public HTTPS URL on:
+- 📱 Android phone
+- 📱 iPhone
+- 💻 Windows PC
+- 🍎 MacBook
+- 🐧 Linux PC
+- 📟 Tablet
+
+No VPN, no port forwarding, no localhost required.
+
+---
+
+## 📡 API Reference
+
+All endpoints are prefixed with `/api`. Full API documentation: [`docs/API.md`](docs/API.md)
+
+### Authentication
+
+| Method | Endpoint | Auth | Description |
+|---|---|---|---|
+| `POST` | `/api/auth/login` | Public | Login — returns session cookie |
+| `POST` | `/api/auth/logout` | Session | Logout — clears session |
+| `GET` | `/api/auth/me` | Session | Get current user profile |
+
+### Shipments
+
+| Method | Endpoint | Auth | Description |
+|---|---|---|---|
+| `GET` | `/api/shipments` | Session | List shipments (role-filtered) |
+| `GET` | `/api/shipments/:id` | Session | Get shipment + status history |
+| `POST` | `/api/shipments` | Session | Create new shipment |
+| `PUT` | `/api/shipments/:id/status` | ADMIN/MANAGER/DRIVER | Update shipment status |
+| `DELETE` | `/api/shipments/:id` | ADMIN only | Delete shipment |
+
+### Fleet, Drivers, Customers
+
+| Method | Endpoint | Auth | Description |
+|---|---|---|---|
+| `GET` | `/api/vehicles` | Session | List all vehicles |
+| `POST` | `/api/vehicles` | ADMIN/MANAGER | Add vehicle |
+| `GET` | `/api/drivers` | Session | List all drivers |
+| `POST` | `/api/drivers` | ADMIN/MANAGER | Add driver |
+| `GET` | `/api/customers` | ADMIN/MANAGER | List all customers |
+| `POST` | `/api/customers` | ADMIN/MANAGER | Add customer |
+
+### Tracking, Routes, Deliveries
+
+| Method | Endpoint | Auth | Description |
+|---|---|---|---|
+| `GET` | `/api/tracking` | Session | All active shipment positions |
+| `GET` | `/api/tracking/:vehicle_id` | Session | Single vehicle tracking |
+| `GET` | `/api/routes` | Session | List all routes |
+| `POST` | `/api/routes/optimize` | Session | Calculate optimal route |
+| `GET` | `/api/deliveries` | Session | List deliveries |
+| `POST` | `/api/deliveries/confirm` | Session | Confirm delivery with OTP |
+
+### Reports & Notifications
+
+| Method | Endpoint | Auth | Description |
+|---|---|---|---|
+| `GET` | `/api/reports/dashboard` | Session | KPI summary for dashboard |
+| `GET` | `/api/reports/:type` | ADMIN/MANAGER | Analytics report (shipments/revenue/fleet/drivers) |
+| `GET` | `/api/payments` | ADMIN/MANAGER | Payment records |
+| `GET` | `/api/notifications` | Session | All notifications |
+| `PUT` | `/api/notifications/:id/read` | Session | Mark notification as read |
+
+---
+
+## 👥 User Roles
+
+APEX FLOW uses Role-Based Access Control (RBAC) with four roles:
+
+| Role | Access Level |
+|---|---|
+| **ADMIN** | Full access — all endpoints including delete, payments, customers, reports |
+| **MANAGER** | Operational access — shipments, fleet, drivers, customers, reports (no delete) |
+| **DRIVER** | Limited — view shipments assigned to them, update delivery status |
+| **CUSTOMER** | Self-service — book and track their own shipments only (IDOR-protected) |
+
+---
+
+## 🔒 Security
+
+APEX FLOW has undergone a full security remediation. Key measures:
+
+| Control | Implementation |
+|---|---|
+| **Authentication** | Server-side Flask sessions with HttpOnly + SameSite=Lax + Secure cookies |
+| **Authorization** | `@login_required` and `@require_role` decorators on every protected route |
+| **IDOR Protection** | Customers can only access their own shipment records |
+| **Rate Limiting** | Global 200 req/min; Login 10/min; OTP confirmation 5/min |
+| **OTP Security** | 6-digit CSPRNG OTP, 30-min expiry, 5-attempt lockout |
+| **Secret Key** | Mandatory via env var; raises `RuntimeError` if missing in production |
+| **CORS** | Locked to explicit origin allowlist (`ALLOWED_ORIGINS` env var) |
+| **Mass Assignment** | Shipment creation uses an explicit field allowlist |
+| **Audit Logging** | Structured JSON security logs for all auth events (PII-redacted) |
+| **SAST** | Custom Semgrep rules in `.semgrep.yml` |
+| **Secret Scanning** | `gitleaks` pre-commit hook in `.pre-commit-config.yaml` |
+
+See the full security audit report: [`docs/SECURITY_AUDIT.md`](docs/SECURITY_AUDIT.md)
+
+---
+
+## 📁 Project Structure
+
+```
+Apex-Flow/
+├── .env.example              # Environment variable template
+├── .gitignore                # Excludes bytecode, .env, databases, IDE files
+├── .pre-commit-config.yaml   # gitleaks + semgrep pre-commit hooks
+├── .semgrep.yml              # Custom SAST rules
+├── Procfile                  # gunicorn start command for Render/Railway
+├── README.md                 # This file
+├── requirements.txt          # Python dependencies
+├── backend/
+│   ├── app.py                # Flask app factory, CORS, rate limiting, session
+│   ├── auth.py               # Auth decorators and authentication service
+│   ├── config.py             # Environment-driven config
+│   ├── database.py           # SQLite/PostgreSQL dual-engine + schema init
+│   ├── logger.py             # Structured security event logger
+│   ├── models.py             # DB row serialization helpers
+│   ├── reports.py            # KPI and analytics queries
+│   ├── routes.py             # All API route handlers
+│   ├── services.py           # Business logic (shipments, vehicles, drivers, etc.)
+│   ├── tracking.py           # Live GPS simulation engine
+│   └── utils.py              # JSON response helpers
+├── frontend/
+│   ├── css/                  # Stylesheets
+│   ├── js/                   # JavaScript modules
+│   ├── login.html            # Login page
+│   ├── dashboard.html        # KPI dashboard
+│   ├── shipments.html        # Shipment management
+│   ├── tracking.html         # Live map tracking
+│   ├── vehicles.html         # Fleet management
+│   ├── drivers.html          # Driver management
+│   ├── customers.html        # Customer management
+│   ├── routes.html           # Route optimization
+│   ├── deliveries.html       # OTP delivery confirmation
+│   ├── payments.html         # Payment records
+│   ├── reports.html          # Analytics reports
+│   ├── notifications.html    # Notification center
+│   ├── warehouses.html       # Warehouse directory
+│   └── settings.html         # Settings page
+├── data/
+│   ├── customers.json        # Seed customer data
+│   ├── drivers.json          # Seed driver data
+│   ├── routes.json           # Seed route data
+│   ├── shipments.json        # Seed shipment data
+│   ├── users.json            # Seed user data
+│   └── vehicles.json         # Seed vehicle data
+└── docs/
+    ├── API.md                # Full API reference
+    ├── SECURITY_AUDIT.md     # Security audit report
+    ├── DEPLOYMENT.md         # Detailed deployment guide
+    └── CONTRIBUTING.md       # Contribution guidelines
 ```
 
 ---
 
-## 🔌 6. REST API Endpoints
+## 🤝 Contributing
 
-APEX FLOW exposes full RESTful JSON APIs:
-
-| Method | Endpoint | Description | Sample Payload |
-| :--- | :--- | :--- | :--- |
-| `POST` | `/api/auth/login` | User login session | `{"email": "admin@apexflow.com", "password": "..."}` |
-| `POST` | `/api/auth/logout` | Clear session | N/A |
-| `GET` | `/api/shipments` | List all shipments | N/A |
-| `POST` | `/api/shipments` | Create new shipment | `{"customer": "ABC Ind", "pickup": "Ludhiana", "destination": "Delhi", "weight": 8000}` |
-| `GET` | `/api/vehicles` | Fleet vehicles list | N/A |
-| `POST` | `/api/vehicles` | Add new vehicle | `{"registration_number": "HR26BX4587", ...}` |
-| `GET` | `/api/drivers` | Drivers roster | N/A |
-| `POST` | `/api/drivers` | Add new driver | `{"name": "Rajesh Kumar", "license_number": "..."}` |
-| `GET` | `/api/customers` | Customer directory | N/A |
-| `GET` | `/api/routes` | Routes list | N/A |
-| `POST` | `/api/routes/optimize` | Calculate route ETA & fuel | `{"pickup": "Delhi", "destination": "Jaipur"}` |
-| `GET` | `/api/tracking` | Live GPS tracking data | N/A |
-| `GET` | `/api/reports/dashboard` | Dashboard KPIs summary | N/A |
-| `GET` | `/api/notifications` | User notifications | N/A |
-
-### Example API Request & Response (`POST /api/shipments`):
-
-**Request**:
-```json
-POST /api/shipments
-Content-Type: application/json
-
-{
-  "customer": "ABC Industries",
-  "pickup": "Ludhiana",
-  "destination": "Delhi",
-  "goods_type": "Electronics",
-  "weight": 8000
-}
-```
-
-**Response**:
-```json
-{
-  "success": true,
-  "shipment_id": "SHP006",
-  "message": "Shipment created successfully",
-  "data": {
-    "shipment_id": "SHP006",
-    "customer_name": "ABC Industries",
-    "pickup_location": "Ludhiana",
-    "destination": "Delhi",
-    "status": "Booked",
-    "shipping_cost": 5000.0
-  }
-}
-```
+See [`docs/CONTRIBUTING.md`](docs/CONTRIBUTING.md) for contribution guidelines, branch policy, and commit message standards.
 
 ---
 
-## 📱 7. Responsive Breakpoints Verification Matrix
+## 📄 License
 
-APEX FLOW has been engineered and tested across standard mobile, tablet, laptop, and desktop resolutions:
-
-| Device Category | Breakpoint Width | Responsive Design Behavior |
-| :--- | :--- | :--- |
-| **Small Mobile** | `320px` | 1-col card grid, drawer navigation, scrollable tables, full-width forms |
-| **Standard Mobile** | `375px` | iPhone layout, touch-optimized tap targets, hamburger menu toggle |
-| **Large Mobile** | `414px` | Plus/Max mobile optimization, touch modals, 100% responsive header |
-| **Tablet Portrait** | `768px` | 2-col dashboard grid, slide-out drawer navigation overlay |
-| **Tablet Landscape**| `1024px` | Expanded stats layout, adaptive chart and map views |
-| **Standard Laptop** | `1366px` | Full fixed sidebar navigation, 4-col KPI metrics grid |
-| **Full HD Desktop** | `1920px` | Max-width content boundary, multi-column analytics grid |
+MIT License — see [LICENSE](LICENSE) for details.
 
 ---
 
-## 🔒 8. Security & Best Practices
-
-- **Zero Hardcoded Secrets**: All API keys, secret keys, and database credentials are read from environment variables.
-- **Production Server**: Runs Gunicorn WSGI server in production instead of Flask's built-in development server.
-- **SQL Injection Prevention**: All queries use parameterized statements across both SQLite and PostgreSQL.
-- **Password Security**: Passwords hashed using `werkzeug.security` (`generate_password_hash` & `check_password_hash`).
-
----
-
-## 📄 License & Credits
-
-Built for enterprise logistics and fleet operations.
-Designed & Developed for **APEX FLOW**. *"Smarter Logistics. Faster Tomorrow."*
+*Built with ❤️ by the APEX FLOW team.*
