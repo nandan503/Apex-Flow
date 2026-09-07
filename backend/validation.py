@@ -18,6 +18,8 @@ def bound_text(value, field, max_len=MAX_TEXT, required=False, default=''):
         if required:
             raise ValidationError(f'{field} is required')
         return default
+    if isinstance(value, (list, dict, bool)):
+        raise ValidationError(f'{field} is invalid')
     text = str(value).strip()
     if required and not text:
         raise ValidationError(f'{field} is required')

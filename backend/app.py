@@ -4,9 +4,9 @@ from datetime import timedelta
 
 sys.path.insert(0, os.path.abspath(os.path.dirname(os.path.dirname(__file__))))
 
-from flask import Flask, send_from_directory, request, jsonify
+from flask import Flask, send_from_directory, request, jsonify, abort
 from flask_cors import CORS
-from werkzeug.exceptions import HTTPException
+from werkzeug.exceptions import HTTPException, NotFound
 from werkzeug.middleware.proxy_fix import ProxyFix
 
 from backend.config import (
@@ -101,10 +101,9 @@ def create_app(config_overrides=None):
         origin = request.headers.get('Origin')
         if not origin:
             return None
-        allowed = set(ALLOWED_ORIGINS)
-        host_origin = request.host_url.rstrip('/')
-        allowed.add(host_origin)
-        if origin.rstrip('/') not in {o.rstrip('/') for o in allowed}:
+        allowed = {o.rstrip('/') for o in ALLOWED_ORIGINS}
+        # Do not trust Host / X-Forwarded-Host — only the explicit allowlist.
+        if origin.rstrip('/') not in allowed:
             return error_response('Cross-origin request blocked', 403, code='CSRF')
         return None
 

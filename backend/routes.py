@@ -33,12 +33,13 @@ def _caller():
 def login():
     data = request.get_json(silent=True) or {}
     email = bound_text(data.get('email'), 'email', max_len=120, required=True)
-    password = data.get('password') or ''
-    if not str(password):
+    password = data.get('password')
+    if not isinstance(password, str) or not password:
         return error_response('Email and password are required', 400)
     # Do not strip interior password characters; only reject empty.
-    if isinstance(password, str):
-        password = password.strip('\n\r')
+    password = password.strip('\n\r')
+    if not password:
+        return error_response('Email and password are required', 400)
 
     user, err = authenticate_user(email, password, ip=request.remote_addr)
     if err:
@@ -264,7 +265,7 @@ def list_deliveries():
 
 @api_bp.route('/deliveries/confirm', methods=['POST'])
 @limiter.limit("5 per minute")
-@require_role('DRIVER', 'ADMIN', 'MANAGER')
+@require_role('DRIVER')
 def confirm_delivery_api():
     data = request.get_json(silent=True) or {}
     shipment_id = data.get('shipment_id')

@@ -14,7 +14,7 @@ function renderDeliveriesTable(deliveries) {
   if (!tbody) return;
 
   const role = (currentUser() || {}).role;
-  const canConfirm = role === 'DRIVER' || role === 'ADMIN' || role === 'MANAGER';
+  const canConfirm = role === 'DRIVER';
 
   tbody.innerHTML = deliveries.map(d => {
     const id = safeId(d.shipment_id);

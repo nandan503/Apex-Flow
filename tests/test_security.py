@@ -166,15 +166,54 @@ def test_otp_confirm_and_replay(client):
 
 
 def test_delivery_does_not_auto_pay_invoice(client):
-    set_delivery_otp_for_tests('SHP004', '654321', driver_id='DRV004')
     assert login(client, 'admin@apexflow.com', 'Admin@123').status_code == 200
+    assert client.put('/api/shipments/SHP004/assign', json={
+        'driver_id': 'DRV001', 'vehicle_id': 'VEH001',
+    }).status_code == 200
+    set_delivery_otp_for_tests('SHP004', '654321', driver_id='DRV001')
+    client.post('/api/auth/logout')
+    assert login(client, 'driver@apexflow.com', 'Driver@123').status_code == 200
     r = client.post('/api/deliveries/confirm', json={
         'shipment_id': 'SHP004', 'otp_code': '654321', 'receiver_name': 'Dock',
     })
     assert r.status_code == 200, r.get_json()
+    client.post('/api/auth/logout')
+    assert login(client, 'admin@apexflow.com', 'Admin@123').status_code == 200
     payments = client.get('/api/payments').get_json()['data']
     shp004 = [p for p in payments if p['shipment_id'] == 'SHP004'][0]
     assert shp004['payment_status'] == 'Pending'
+
+
+def test_manager_cannot_confirm_otp(client):
+    set_delivery_otp_for_tests('SHP001', '111111', driver_id='DRV001')
+    assert login(client, 'manager@apexflow.com', 'Manager@123').status_code == 200
+    r = client.post('/api/deliveries/confirm', json={
+        'shipment_id': 'SHP001', 'otp_code': '111111', 'receiver_name': 'Mgr',
+    })
+    assert r.status_code == 403
+
+
+def test_password_must_be_string(client):
+    r = client.post('/api/auth/login', json={
+        'email': 'admin@apexflow.com', 'password': ['Admin@123'],
+    })
+    assert r.status_code == 400
+
+
+def test_csrf_rejects_foreign_origin(client):
+    assert login(client, 'admin@apexflow.com', 'Admin@123').status_code == 200
+    r = client.delete('/api/shipments/SHP005', headers={'Origin': 'https://evil.com'})
+    assert r.status_code == 403
+    assert r.get_json()['error'] == 'CSRF'
+
+
+def test_csrf_does_not_trust_host_header(client):
+    assert login(client, 'admin@apexflow.com', 'Admin@123').status_code == 200
+    r = client.delete('/api/shipments/SHP005', headers={
+        'Origin': 'http://evil.com',
+        'Host': 'evil.com',
+    })
+    assert r.status_code == 403
 
 
 def test_seed_otp_4912_rejected(client):

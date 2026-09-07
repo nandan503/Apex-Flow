@@ -106,12 +106,19 @@ def allowed_status_targets(caller: Caller, current: str):
     return nxt
 
 
+OTP_ELIGIBLE_STATUSES = frozenset({
+    'Picked Up', 'At Warehouse', 'In Transit', 'Out for Delivery', 'Delayed',
+})
+
+
 def assert_status_transition(caller: Caller, current: str, new_status: str, via_otp=False):
     if via_otp:
         if new_status != 'Delivered':
             deny('OTP confirmation can only mark a shipment Delivered')
         if current == 'Delivered':
             deny('Shipment already delivered')
+        if current not in OTP_ELIGIBLE_STATUSES:
+            deny(f'Cannot confirm delivery from status {current}')
         return
     if new_status == 'Delivered':
         deny('Deliveries must be confirmed with the receiver OTP')
@@ -125,8 +132,7 @@ def assert_status_transition(caller: Caller, current: str, new_status: str, via_
 def delivery_confirmable(caller: Caller, delivery: dict) -> bool:
     if not delivery:
         return False
-    if caller.is_staff:
-        return True
+    # Custody handoff is the assigned driver's job — staff cannot skip that control.
     if caller.is_driver:
         return bool(caller.driver_id) and delivery.get('driver_id') == caller.driver_id
     return False

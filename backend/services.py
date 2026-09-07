@@ -82,6 +82,9 @@ def get_all_shipments(status_filter=None, search=None, caller: Caller = None):
         term = bound_text(search, 'search', max_len=80)
         # Strip LIKE wildcards so callers cannot widen a scoped query
         term = term.replace('%', '').replace('_', '')
+        if not term:
+            search = None
+    if search:
         query += (
             " AND (shipment_id LIKE ? OR customer_name LIKE ? OR pickup_location LIKE ? "
             "OR destination LIKE ? OR vehicle_reg LIKE ? OR driver_name LIKE ?)"
@@ -613,10 +616,8 @@ def get_all_deliveries(caller: Caller):
 
 
 def confirm_delivery(shipment_id, otp_entered, caller: Caller, receiver_name=None, ip='unknown'):
-    if caller.is_customer:
-        deny('Forbidden — customers cannot confirm deliveries')
-    if not caller.is_driver and not caller.is_staff:
-        deny()
+    if not caller.is_driver:
+        deny('Forbidden — only the assigned driver can confirm a delivery')
 
     shipment_id = bound_text(shipment_id, 'shipment_id', required=True)
     otp_entered = bound_text(otp_entered, 'otp_code', max_len=12, required=True)
