@@ -245,6 +245,8 @@ def initialize_database():
         actual_delivery TIMESTAMP,
         status TEXT NOT NULL CHECK(status IN ('Pending', 'In Progress', 'Delivered', 'Failed')),
         otp_code TEXT NOT NULL,
+        otp_attempts INTEGER NOT NULL DEFAULT 0,
+        otp_expires_at TIMESTAMP,
         receiver_name TEXT,
         delivery_notes TEXT,
         signature_data TEXT,
@@ -298,6 +300,21 @@ def initialize_database():
     ''')
 
     conn.commit()
+
+    # ── Schema migrations (idempotent — safe to run on existing databases) ──────
+    # Add OTP security columns if they don't exist (upgrading from pre-patch schema)
+    _migration_columns = [
+        ("deliveries", "otp_attempts", "INTEGER NOT NULL DEFAULT 0"),
+        ("deliveries", "otp_expires_at", "TIMESTAMP"),
+    ]
+    for table, col, col_def in _migration_columns:
+        try:
+            cursor.execute(f"ALTER TABLE {table} ADD COLUMN {col} {col_def}")
+            conn.commit()
+            print(f"[Migration] Added column '{col}' to '{table}'.")
+        except Exception:
+            pass  # Column already exists — safe to ignore
+
     seed_demo_data(conn)
     conn.close()
 
@@ -308,11 +325,36 @@ def seed_demo_data(conn):
         return  # Database already seeded
 
     # Seed Users
+    # SECURITY: Passwords loaded from environment variables.
+    # In production, set SEED_ADMIN_PASSWORD, SEED_MANAGER_PASSWORD, etc.
+    # Never commit real passwords to source control.
+    import os as _os
+    _is_prod = _os.environ.get('FLASK_ENV') == 'production'
+    def _seed_pw(env_var, default_dev_pw):
+        pw = _os.environ.get(env_var)
+        if pw:
+            return pw
+        if _is_prod:
+            raise RuntimeError(
+                f"[SECURITY] Seed password env var '{env_var}' must be set in production."
+            )
+        print(f"[DEV WARNING] {env_var} not set — using insecure default '{default_dev_pw}'. "
+              "Change before any public deployment.")
+        return default_dev_pw
+
     users_data = [
-        ('USR001', 'System Admin', 'admin@apexflow.com', generate_password_hash('Admin@123'), 'ADMIN', '+91 9876543210'),
-        ('USR002', 'Logistics Manager', 'manager@apexflow.com', generate_password_hash('Manager@123'), 'MANAGER', '+91 9876543211'),
-        ('USR003', 'Rajesh Kumar', 'driver@apexflow.com', generate_password_hash('Driver@123'), 'DRIVER', '+91 9876543212'),
-        ('USR004', 'ABC Industries', 'customer@apexflow.com', generate_password_hash('Customer@123'), 'CUSTOMER', '+91 9876543213'),
+        ('USR001', 'System Admin', 'admin@apexflow.com',
+         generate_password_hash(_seed_pw('SEED_ADMIN_PASSWORD', 'Admin@123')),
+         'ADMIN', '+91 9876543210'),
+        ('USR002', 'Logistics Manager', 'manager@apexflow.com',
+         generate_password_hash(_seed_pw('SEED_MANAGER_PASSWORD', 'Manager@123')),
+         'MANAGER', '+91 9876543211'),
+        ('USR003', 'Rajesh Kumar', 'driver@apexflow.com',
+         generate_password_hash(_seed_pw('SEED_DRIVER_PASSWORD', 'Driver@123')),
+         'DRIVER', '+91 9876543212'),
+        ('USR004', 'ABC Industries', 'customer@apexflow.com',
+         generate_password_hash(_seed_pw('SEED_CUSTOMER_PASSWORD', 'Customer@123')),
+         'CUSTOMER', '+91 9876543213'),
     ]
     cursor.executemany("INSERT INTO users (user_id, name, email, password_hash, role, phone) VALUES (?,?,?,?,?,?)", users_data)
 

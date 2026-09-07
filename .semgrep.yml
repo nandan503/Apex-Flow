@@ -1,0 +1,114 @@
+# APEX FLOW Custom Semgrep Rules
+# Run: semgrep --config .semgrep.yml backend/
+# Install: pip install semgrep
+rules:
+
+  - id: apexflow-unauthenticated-route
+    message: |
+      Flask route missing @login_required or @require_role decorator.
+      Every API endpoint must be protected. Apply @login_required at minimum.
+    languages: [python]
+    severity: ERROR
+    patterns:
+      - pattern: |
+          @$BP.route($PATH, ...)
+          def $FUNC(...):
+              ...
+      - pattern-not: |
+          @$BP.route($PATH, ...)
+          @login_required
+          def $FUNC(...):
+              ...
+      - pattern-not: |
+          @$BP.route($PATH, ...)
+          @require_role(...)
+          def $FUNC(...):
+              ...
+      - pattern-not: |
+          @$BP.route("/api/auth/login", ...)
+          def $FUNC(...):
+              ...
+      - pattern-not: |
+          @$BP.route("/api/auth/logout", ...)
+          def $FUNC(...):
+              ...
+    paths:
+      include:
+        - backend/routes.py
+
+  - id: apexflow-mass-assignment-status
+    message: |
+      Client-controlled 'status' or 'payment_status' detected in service layer.
+      These fields must always be set server-side — never from request body.
+      (F-02: Mass-Assignment vulnerability)
+    languages: [python]
+    severity: ERROR
+    patterns:
+      - pattern: data.get('status', ...)
+    paths:
+      include:
+        - backend/services.py
+
+  - id: apexflow-mass-assignment-payment
+    message: |
+      Client-controlled 'payment_status' detected in service layer.
+      Payment status must always be set server-side, never from client input.
+    languages: [python]
+    severity: ERROR
+    patterns:
+      - pattern: data.get('payment_status', ...)
+    paths:
+      include:
+        - backend/services.py
+
+  - id: apexflow-select-star
+    message: |
+      SELECT * used in query. Prefer explicit column lists to avoid accidentally
+      returning sensitive fields (otp_code, password_hash, etc.) to API callers.
+    languages: [python]
+    severity: WARNING
+    patterns:
+      - pattern: cursor.execute("SELECT * FROM ...")
+    paths:
+      include:
+        - backend/
+
+  - id: apexflow-updated-by-from-request
+    message: |
+      'updated_by' sourced from request body. Audit log fields must always
+      derive from server-side session to prevent log tampering (F-08).
+    languages: [python]
+    severity: ERROR
+    patterns:
+      - pattern: |
+          updated_by = data.get('updated_by', ...)
+    paths:
+      include:
+        - backend/routes.py
+
+  - id: apexflow-weak-otp
+    message: |
+      Weak OTP generation using uuid4 modulus arithmetic.
+      Use secrets.randbelow() for CSPRNG-based OTPs with adequate key space.
+    languages: [python]
+    severity: ERROR
+    patterns:
+      - pattern: uuid.uuid4().int % $N
+    paths:
+      include:
+        - backend/
+
+  - id: apexflow-hardcoded-secret
+    message: |
+      Hardcoded secret string detected. Secrets must be loaded from environment
+      variables and must not have plaintext fallback defaults in production.
+    languages: [python]
+    severity: ERROR
+    patterns:
+      - pattern: os.environ.get($KEY, "$DEFAULT_VALUE")
+      - metavariable-regex:
+          metavariable: $KEY
+          regex: ".*(SECRET|PASSWORD|TOKEN|KEY|API_KEY).*"
+    paths:
+      include:
+        - backend/

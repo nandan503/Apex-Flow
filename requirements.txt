@@ -1,5 +1,7 @@
 Flask>=2.3.0
 flask-cors>=4.0.0
+flask-limiter>=3.5.0
+limits>=3.6.0
 gunicorn>=21.2.0
 psycopg2-binary>=2.9.0
 python-dotenv>=1.0.0
