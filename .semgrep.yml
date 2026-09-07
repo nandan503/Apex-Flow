@@ -1,6 +1,5 @@
 # APEX FLOW Custom Semgrep Rules
 # Run: semgrep --config .semgrep.yml backend/
-# Install: pip install semgrep
 rules:
 
   - id: apexflow-unauthenticated-route
@@ -25,11 +24,24 @@ rules:
           def $FUNC(...):
               ...
       - pattern-not: |
-          @$BP.route("/api/auth/login", ...)
+          @$BP.route($PATH, ...)
+          @limiter.limit(...)
           def $FUNC(...):
               ...
       - pattern-not: |
-          @$BP.route("/api/auth/logout", ...)
+          @$BP.route("/auth/login", ...)
+          def $FUNC(...):
+              ...
+      - pattern-not: |
+          @$BP.route("/auth/logout", ...)
+          def $FUNC(...):
+              ...
+      - pattern-not: |
+          @$BP.route('/auth/login', ...)
+          def $FUNC(...):
+              ...
+      - pattern-not: |
+          @$BP.route('/auth/logout', ...)
           def $FUNC(...):
               ...
     paths:
@@ -38,9 +50,8 @@ rules:
 
   - id: apexflow-mass-assignment-status
     message: |
-      Client-controlled 'status' or 'payment_status' detected in service layer.
-      These fields must always be set server-side — never from request body.
-      (F-02: Mass-Assignment vulnerability)
+      Client-controlled 'status' detected in service layer.
+      Status must always be set server-side — never from request body.
     languages: [python]
     severity: ERROR
     patterns:
@@ -76,7 +87,7 @@ rules:
   - id: apexflow-updated-by-from-request
     message: |
       'updated_by' sourced from request body. Audit log fields must always
-      derive from server-side session to prevent log tampering (F-08).
+      derive from server-side session to prevent log tampering.
     languages: [python]
     severity: ERROR
     patterns:

@@ -1,4 +1,5 @@
-from flask import jsonify, session
+from flask import jsonify
+
 
 def json_response(data=None, message=None, success=True, status_code=200, **extra):
     response = {
@@ -10,6 +11,13 @@ def json_response(data=None, message=None, success=True, status_code=200, **extr
         response.update(extra)
     return jsonify(response), status_code
 
-def error_response(message, status_code=400):
-    return json_response(data=None, message=message, success=False, status_code=status_code)
 
+def error_response(message, status_code=400, code=None):
+    payload = {
+        'success': False,
+        'message': message,
+        'data': None,
+    }
+    if code:
+        payload['error'] = code
+    return jsonify(payload), status_code

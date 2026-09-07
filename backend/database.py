@@ -1,21 +1,27 @@
-import sqlite3
 import os
-from werkzeug.security import generate_password_hash
-from backend.config import DATABASE_PATH, DATABASE_URL
+import sqlite3
+from contextlib import contextmanager
+from datetime import datetime, timedelta
 
-# PostgreSQL Helper Wrapper for SQLite API Compatibility
+from werkzeug.security import generate_password_hash, check_password_hash
+
+from backend.config import (
+    get_database_path, DATABASE_URL, IS_PRODUCTION, KNOWN_DEFAULT_PASSWORDS, DATA_DIR,
+)
+
+
 class PostgresRow(dict):
     def __getitem__(self, key):
         if isinstance(key, int):
             return list(self.values())[key]
         return super().__getitem__(key)
 
+
 class PostgresCursorWrapper:
     def __init__(self, pg_cursor):
         self.cursor = pg_cursor
 
     def execute(self, query, params=None):
-        # Translate SQLite AUTOINCREMENT and ? placeholders for PostgreSQL
         pg_query = query.replace('AUTOINCREMENT', '').replace('?', '%s')
         if params is not None:
             self.cursor.execute(pg_query, params)
@@ -42,6 +48,19 @@ class PostgresCursorWrapper:
         colnames = [desc[0] for desc in self.cursor.description]
         return [PostgresRow(zip(colnames, r)) for r in rows]
 
+    @property
+    def rowcount(self):
+        return self.cursor.rowcount
+
+    @property
+    def lastrowid(self):
+        return self.cursor.lastrowid
+
+    @property
+    def description(self):
+        return self.cursor.description
+
+
 class PostgresConnWrapper:
     def __init__(self, pg_conn):
         self.conn = pg_conn
@@ -63,43 +82,75 @@ class PostgresConnWrapper:
         cur.execute(query, params)
         return cur
 
-def get_db_connection():
+
+def _connect():
     db_url = DATABASE_URL or os.environ.get('DATABASE_URL', '')
-    if db_url and (db_url.startswith('postgres://') or db_url.startswith('postgresql://')):
+    if db_url:
+        if not (db_url.startswith('postgres://') or db_url.startswith('postgresql://')):
+            raise RuntimeError('DATABASE_URL must be a postgresql:// URI')
         try:
             import psycopg2
-            if db_url.startswith('postgres://'):
-                db_url = db_url.replace('postgres://', 'postgresql://', 1)
+        except ImportError as exc:
+            raise RuntimeError('psycopg2 is required when DATABASE_URL is set') from exc
+        if db_url.startswith('postgres://'):
+            db_url = db_url.replace('postgres://', 'postgresql://', 1)
+        try:
             pg_conn = psycopg2.connect(db_url)
-            pg_conn.autocommit = False
-            return PostgresConnWrapper(pg_conn)
-        except Exception as e:
-            print(f"[DB Warning] Could not connect to PostgreSQL ({e}). Falling back to SQLite.")
+        except Exception:
+            # Fail closed — never fall back to a different engine in production/cloud.
+            raise RuntimeError(
+                'PostgreSQL is configured but the connection failed. Refusing SQLite fallback.'
+            ) from None
+        pg_conn.autocommit = False
+        return PostgresConnWrapper(pg_conn)
 
-    # SQLite fallback for local development
-    conn = sqlite3.connect(DATABASE_PATH)
+    os.makedirs(DATA_DIR, exist_ok=True)
+    conn = sqlite3.connect(get_database_path(), timeout=15)
     conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA foreign_keys = ON;")
+    conn.execute('PRAGMA foreign_keys = ON;')
+    conn.execute('PRAGMA busy_timeout = 5000;')
     return conn
 
+
+def get_db_connection():
+    """Open a new connection. Prefer db_session() so connections cannot leak."""
+    return _connect()
+
+
+@contextmanager
+def db_session():
+    conn = _connect()
+    try:
+        yield conn
+        conn.commit()
+    except Exception:
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        raise
+    finally:
+        conn.close()
+
+
 def initialize_database():
-    conn = get_db_connection()
-    cursor = conn.cursor()
+    conn = _connect()
+    try:
+        cursor = conn.cursor()
+        _create_tables(cursor)
+        conn.commit()
+        _migrate_columns(conn)
+        seed_demo_data(conn)
+        _link_identities(conn)
+        _rotate_plaintext_otps(conn)
+        conn.commit()
+        if IS_PRODUCTION:
+            _assert_no_default_passwords(conn)
+    finally:
+        conn.close()
 
-    # 1. Users table
-    cursor.execute('''
-    CREATE TABLE IF NOT EXISTS users (
-        user_id TEXT PRIMARY KEY,
-        name TEXT NOT NULL,
-        email TEXT UNIQUE NOT NULL,
-        password_hash TEXT NOT NULL,
-        role TEXT NOT NULL CHECK(role IN ('ADMIN', 'MANAGER', 'DRIVER', 'CUSTOMER')),
-        phone TEXT,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    );
-    ''')
 
-    # 2. Customers table
+def _create_tables(cursor):
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS customers (
         customer_id TEXT PRIMARY KEY,
@@ -114,7 +165,6 @@ def initialize_database():
     );
     ''')
 
-    # 3. Vehicles table
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS vehicles (
         vehicle_id TEXT PRIMARY KEY,
@@ -136,7 +186,6 @@ def initialize_database():
     );
     ''')
 
-    # 4. Drivers table
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS drivers (
         driver_id TEXT PRIMARY KEY,
@@ -156,7 +205,22 @@ def initialize_database():
     );
     ''')
 
-    # 5. Shipments table
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS users (
+        user_id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        email TEXT UNIQUE NOT NULL,
+        password_hash TEXT NOT NULL,
+        role TEXT NOT NULL CHECK(role IN ('ADMIN', 'MANAGER', 'DRIVER', 'CUSTOMER')),
+        phone TEXT,
+        customer_id TEXT,
+        driver_id TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY(customer_id) REFERENCES customers(customer_id),
+        FOREIGN KEY(driver_id) REFERENCES drivers(driver_id)
+    );
+    ''')
+
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS shipments (
         shipment_id TEXT PRIMARY KEY,
@@ -187,7 +251,6 @@ def initialize_database():
     );
     ''')
 
-    # 6. Shipment status history table
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS shipment_status_history (
         history_id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -201,7 +264,6 @@ def initialize_database():
     );
     ''')
 
-    # 7. Routes table
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS routes (
         route_id TEXT PRIMARY KEY,
@@ -216,7 +278,6 @@ def initialize_database():
     );
     ''')
 
-    # 8. Warehouses table
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS warehouses (
         warehouse_id TEXT PRIMARY KEY,
@@ -231,7 +292,6 @@ def initialize_database():
     );
     ''')
 
-    # 9. Deliveries table
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS deliveries (
         delivery_id TEXT PRIMARY KEY,
@@ -254,7 +314,6 @@ def initialize_database():
     );
     ''')
 
-    # 10. Payments table
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS payments (
         invoice_id TEXT PRIMARY KEY,
@@ -267,11 +326,10 @@ def initialize_database():
         payment_status TEXT NOT NULL CHECK(payment_status IN ('Pending', 'Paid', 'Failed', 'Refunded')),
         invoice_date DATE NOT NULL,
         paid_date DATE,
-        FOREIGN KEY(shipment_id) REFERENCES shipments(shipment_id)
+        FOREIGN KEY(shipment_id) REFERENCES shipments(shipment_id) ON DELETE CASCADE
     );
     ''')
 
-    # 11. Notifications table
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS notifications (
         notification_id TEXT PRIMARY KEY,
@@ -284,7 +342,6 @@ def initialize_database():
     );
     ''')
 
-    # 12. Maintenance Records table
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS maintenance_records (
         record_id TEXT PRIMARY KEY,
@@ -299,42 +356,86 @@ def initialize_database():
     );
     ''')
 
-    conn.commit()
 
-    # ── Schema migrations (idempotent — safe to run on existing databases) ──────
-    # Add OTP security columns if they don't exist (upgrading from pre-patch schema)
-    _migration_columns = [
+def _migrate_columns(conn):
+    cursor = conn.cursor()
+    migrations = [
         ("deliveries", "otp_attempts", "INTEGER NOT NULL DEFAULT 0"),
         ("deliveries", "otp_expires_at", "TIMESTAMP"),
+        ("users", "customer_id", "TEXT"),
+        ("users", "driver_id", "TEXT"),
     ]
-    for table, col, col_def in _migration_columns:
+    for table, col, col_def in migrations:
         try:
             cursor.execute(f"ALTER TABLE {table} ADD COLUMN {col} {col_def}")
             conn.commit()
-            print(f"[Migration] Added column '{col}' to '{table}'.")
         except Exception:
-            pass  # Column already exists — safe to ignore
+            pass
 
-    seed_demo_data(conn)
-    conn.close()
+
+def _link_identities(conn):
+    cursor = conn.cursor()
+    cursor.execute(
+        "UPDATE users SET customer_id = ? WHERE email = ? AND (customer_id IS NULL OR customer_id = '')",
+        ('CUST001', 'customer@apexflow.com'),
+    )
+    cursor.execute(
+        "UPDATE users SET driver_id = ? WHERE email = ? AND (driver_id IS NULL OR driver_id = '')",
+        ('DRV001', 'driver@apexflow.com'),
+    )
+
+
+def _otp_is_plaintext(value):
+    if not value or not isinstance(value, str):
+        return False
+    if value == 'USED':
+        return False
+    return ':' not in value
+
+
+def _rotate_plaintext_otps(conn):
+    """Invalidate OTPs that were stored in plaintext (including leaked seed codes)."""
+    cursor = conn.cursor()
+    try:
+        cursor.execute("SELECT delivery_id, otp_code FROM deliveries")
+    except Exception:
+        return
+    rows = cursor.fetchall()
+    expired = (datetime.now() - timedelta(days=1)).strftime('%Y-%m-%d %H:%M:%S')
+    for row in rows:
+        rowd = dict(row)
+        if _otp_is_plaintext(rowd.get('otp_code')):
+            cursor.execute(
+                "UPDATE deliveries SET otp_code = ?, otp_expires_at = ?, otp_attempts = 5 "
+                "WHERE delivery_id = ?",
+                (generate_password_hash('invalid-rotated-otp'), expired, rowd['delivery_id']),
+            )
+
+
+def _assert_no_default_passwords(conn):
+    cursor = conn.cursor()
+    cursor.execute("SELECT email, password_hash FROM users")
+    for row in cursor.fetchall():
+        email = row['email']
+        default_pw = KNOWN_DEFAULT_PASSWORDS.get(email)
+        if default_pw and check_password_hash(row['password_hash'], default_pw):
+            raise RuntimeError(
+                f"[SECURITY] Refusing to start: user '{email}' still has a documented default password. "
+                "Set SEED_*_PASSWORD before the first run and/or rotate hashes."
+            )
+
 
 def seed_demo_data(conn):
     cursor = conn.cursor()
     cursor.execute("SELECT COUNT(*) FROM users")
     if cursor.fetchone()[0] > 0:
-        return  # Database already seeded
+        return
 
-    # Seed Users
-    # SECURITY: Passwords loaded from environment variables.
-    # In production, set SEED_ADMIN_PASSWORD, SEED_MANAGER_PASSWORD, etc.
-    # Never commit real passwords to source control.
-    import os as _os
-    _is_prod = _os.environ.get('FLASK_ENV') == 'production'
     def _seed_pw(env_var, default_dev_pw):
-        pw = _os.environ.get(env_var)
+        pw = os.environ.get(env_var)
         if pw:
             return pw
-        if _is_prod:
+        if IS_PRODUCTION:
             raise RuntimeError(
                 f"[SECURITY] Seed password env var '{env_var}' must be set in production."
             )
@@ -342,23 +443,6 @@ def seed_demo_data(conn):
               "Change before any public deployment.")
         return default_dev_pw
 
-    users_data = [
-        ('USR001', 'System Admin', 'admin@apexflow.com',
-         generate_password_hash(_seed_pw('SEED_ADMIN_PASSWORD', 'Admin@123')),
-         'ADMIN', '+91 9876543210'),
-        ('USR002', 'Logistics Manager', 'manager@apexflow.com',
-         generate_password_hash(_seed_pw('SEED_MANAGER_PASSWORD', 'Manager@123')),
-         'MANAGER', '+91 9876543211'),
-        ('USR003', 'Rajesh Kumar', 'driver@apexflow.com',
-         generate_password_hash(_seed_pw('SEED_DRIVER_PASSWORD', 'Driver@123')),
-         'DRIVER', '+91 9876543212'),
-        ('USR004', 'ABC Industries', 'customer@apexflow.com',
-         generate_password_hash(_seed_pw('SEED_CUSTOMER_PASSWORD', 'Customer@123')),
-         'CUSTOMER', '+91 9876543213'),
-    ]
-    cursor.executemany("INSERT INTO users (user_id, name, email, password_hash, role, phone) VALUES (?,?,?,?,?,?)", users_data)
-
-    # Seed Customers
     customers_data = [
         ('CUST001', 'ABC Industries', 'ABC Group Ltd', '+91 9811223344', 'contact@abcind.com', 'GT Road, Ludhiana, Punjab', 12, 142000.0),
         ('CUST002', 'Zenith Electronics', 'Zenith Tech Corp', '+91 9822334455', 'logistics@zenith.com', 'Sector 18, Gurgaon, Haryana', 8, 98500.0),
@@ -366,9 +450,11 @@ def seed_demo_data(conn):
         ('CUST004', 'Apex Retail Solutions', 'Apex Retail', '+91 9844556677', 'orders@apexretail.in', 'Connaught Place, New Delhi', 5, 45000.0),
         ('CUST005', 'Royal Textile Mills', 'Royal Fabrics', '+91 9855667788', 'info@royaltextiles.com', 'Textile Hub, Ahmedabad, Gujarat', 9, 118000.0)
     ]
-    cursor.executemany("INSERT INTO customers (customer_id, name, company, phone, email, address, total_shipments, total_spent) VALUES (?,?,?,?,?,?,?,?)", customers_data)
+    cursor.executemany(
+        "INSERT INTO customers (customer_id, name, company, phone, email, address, total_shipments, total_spent) VALUES (?,?,?,?,?,?,?,?)",
+        customers_data,
+    )
 
-    # Seed Vehicles
     vehicles_data = [
         ('VEH001', 'HR26BX4587', 'Truck', 'Tata', 'Prima 2830.K', 2023, 15.0, 'Diesel', 'Delhi', 'DRV001', '2027-05-15', '2027-06-30', '2027-04-10', '2026-11-15', 'Available'),
         ('VEH002', 'PB10CD1234', 'Container', 'Ashok Leyland', 'AVTR 3520', 2022, 25.0, 'Diesel', 'Jaipur', 'DRV002', '2027-02-10', '2027-03-20', '2027-01-15', '2026-10-05', 'On Trip'),
@@ -376,9 +462,11 @@ def seed_demo_data(conn):
         ('VEH004', 'RJ14GH9012', 'Truck', 'BharatBenz', '1617R', 2021, 12.0, 'Diesel', 'Jaipur', 'DRV004', '2026-10-15', '2026-11-20', '2026-09-30', '2026-09-10', 'Maintenance'),
         ('VEH005', 'DL8CAB6789', 'Container', 'Mahindra', 'Blazo X 28', 2023, 20.0, 'Diesel', 'Mumbai', 'DRV005', '2027-04-05', '2027-05-10', '2027-03-15', '2026-10-25', 'On Trip')
     ]
-    cursor.executemany("INSERT INTO vehicles (vehicle_id, registration_number, vehicle_type, make, model, year, capacity_mt, fuel_type, current_location, assigned_driver_id, insurance_expiry, permit_expiry, fitness_expiry, service_due_date, status) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", vehicles_data)
+    cursor.executemany(
+        "INSERT INTO vehicles (vehicle_id, registration_number, vehicle_type, make, model, year, capacity_mt, fuel_type, current_location, assigned_driver_id, insurance_expiry, permit_expiry, fitness_expiry, service_due_date, status) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        vehicles_data,
+    )
 
-    # Seed Drivers
     drivers_data = [
         ('DRV001', 'Rajesh Kumar', '+91 9876543212', 'driver@apexflow.com', 'DL-1420110098', '2028-09-15', 'Flat 402, Rohini, Delhi', 8, 'VEH001', 'Available', 142, 140, 4.9),
         ('DRV002', 'Sukhwinder Singh', '+91 9876543222', 'sukhwinder@apexflow.com', 'PB-0820150042', '2027-11-20', 'Model Town, Ludhiana, Punjab', 11, 'VEH002', 'On Trip', 210, 205, 4.8),
@@ -386,9 +474,30 @@ def seed_demo_data(conn):
         ('DRV004', 'Ramesh Patel', '+91 9876543244', 'ramesh@apexflow.com', 'GJ-0120140089', '2027-06-05', 'Ashram Road, Ahmedabad', 14, 'VEH004', 'Off Duty', 315, 308, 4.9),
         ('DRV005', 'Amit Sharma', '+91 9876543255', 'amit@apexflow.com', 'DL-0420190033', '2028-04-18', 'Dwarka Sector 7, New Delhi', 6, 'VEH005', 'On Trip', 98, 96, 4.6)
     ]
-    cursor.executemany("INSERT INTO drivers (driver_id, name, phone, email, license_number, license_expiry, address, experience_years, assigned_vehicle_id, status, total_trips, completed_trips, rating) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)", drivers_data)
+    cursor.executemany(
+        "INSERT INTO drivers (driver_id, name, phone, email, license_number, license_expiry, address, experience_years, assigned_vehicle_id, status, total_trips, completed_trips, rating) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        drivers_data,
+    )
 
-    # Seed Shipments
+    users_data = [
+        ('USR001', 'System Admin', 'admin@apexflow.com',
+         generate_password_hash(_seed_pw('SEED_ADMIN_PASSWORD', 'Admin@123')),
+         'ADMIN', '+91 9876543210', None, None),
+        ('USR002', 'Logistics Manager', 'manager@apexflow.com',
+         generate_password_hash(_seed_pw('SEED_MANAGER_PASSWORD', 'Manager@123')),
+         'MANAGER', '+91 9876543211', None, None),
+        ('USR003', 'Rajesh Kumar', 'driver@apexflow.com',
+         generate_password_hash(_seed_pw('SEED_DRIVER_PASSWORD', 'Driver@123')),
+         'DRIVER', '+91 9876543212', None, 'DRV001'),
+        ('USR004', 'ABC Industries', 'customer@apexflow.com',
+         generate_password_hash(_seed_pw('SEED_CUSTOMER_PASSWORD', 'Customer@123')),
+         'CUSTOMER', '+91 9876543213', 'CUST001', None),
+    ]
+    cursor.executemany(
+        "INSERT INTO users (user_id, name, email, password_hash, role, phone, customer_id, driver_id) VALUES (?,?,?,?,?,?,?,?)",
+        users_data,
+    )
+
     shipments_data = [
         ('SHP001', 'CUST001', 'ABC Industries', 'Ludhiana', 'Delhi', 'Electronics', '50 Crates of LED Displays', 8000.0, 50, 'VEH001', 'HR26BX4587', 'DRV001', 'Rajesh Kumar', 'In Transit', '2026-09-05', '2026-09-08', 8500.0, 'Online Bank Transfer', 'Paid', 'Handle with extreme care, fragile goods.'),
         ('SHP002', 'CUST002', 'Zenith Electronics', 'Chandigarh', 'Jaipur', 'Consumer Tech', '20 Pallets of Smart TVs', 4500.0, 20, 'VEH002', 'PB10CD1234', 'DRV002', 'Sukhwinder Singh', 'Picked Up', '2026-09-06', '2026-09-09', 12400.0, 'Credit Invoice', 'Pending', 'Keep dry, priority shipment.'),
@@ -396,64 +505,85 @@ def seed_demo_data(conn):
         ('SHP004', 'CUST004', 'Apex Retail Solutions', 'Kanpur', 'Patna', 'Garments & Retail', '80 Cartons Apparel', 6000.0, 80, 'VEH004', 'RJ14GH9012', 'DRV004', 'Ramesh Patel', 'Delayed', '2026-09-01', '2026-09-04', 15800.0, 'Credit Invoice', 'Pending', 'Weather delay near Kanpur highway.'),
         ('SHP005', 'CUST005', 'Royal Textile Mills', 'Amritsar', 'Bangalore', 'Raw Cotton Bales', '35 Bales of Raw Cotton', 14000.0, 35, 'VEH002', 'PB10CD1234', 'DRV002', 'Sukhwinder Singh', 'In Transit', '2026-09-04', '2026-09-10', 38000.0, 'Bank Transfer', 'Paid', 'Long distance express freight.')
     ]
-    cursor.executemany("INSERT INTO shipments (shipment_id, customer_id, customer_name, pickup_location, destination, goods_type, description, weight_kg, quantity, vehicle_id, vehicle_reg, driver_id, driver_name, status, booking_date, expected_delivery, shipping_cost, payment_method, payment_status, special_instructions) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", shipments_data)
+    cursor.executemany(
+        "INSERT INTO shipments (shipment_id, customer_id, customer_name, pickup_location, destination, goods_type, description, weight_kg, quantity, vehicle_id, vehicle_reg, driver_id, driver_name, status, booking_date, expected_delivery, shipping_cost, payment_method, payment_status, special_instructions) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        shipments_data,
+    )
 
-    # Seed Status History
     status_history_data = [
         (1, 'SHP001', 'Booked', '2026-09-05 09:00:00', 'Ludhiana Warehouse', 'System Admin', 'Shipment booked by ABC Industries'),
         (2, 'SHP001', 'Confirmed', '2026-09-05 10:30:00', 'Ludhiana Dispatch', 'Logistics Manager', 'Vehicle HR26BX4587 assigned'),
         (3, 'SHP001', 'Picked Up', '2026-09-05 14:15:00', 'Ludhiana Cargo Hub', 'Rajesh Kumar', 'Goods loaded and verified'),
         (4, 'SHP001', 'In Transit', '2026-09-06 08:00:00', 'Ambala Highway NH44', 'GPS Automated Tracker', 'En route to Delhi destination'),
-        (5, 'SHP003', 'Delivered', '2026-09-05 17:45:00', 'Mumbai Central Logistics Hub', 'Amit Sharma', 'Delivered & OTP 8492 verified by Receiver')
+        (5, 'SHP003', 'Delivered', '2026-09-05 17:45:00', 'Mumbai Central Logistics Hub', 'Amit Sharma', 'Delivered and OTP verified by Receiver')
     ]
-    cursor.executemany("INSERT INTO shipment_status_history (history_id, shipment_id, status, timestamp, location, updated_by, notes) VALUES (?,?,?,?,?,?,?)", status_history_data)
+    cursor.executemany(
+        "INSERT INTO shipment_status_history (history_id, shipment_id, status, timestamp, location, updated_by, notes) VALUES (?,?,?,?,?,?,?)",
+        status_history_data,
+    )
 
-    # Seed Routes
     routes_data = [
         ('RTE001', 'Delhi', 'Jaipur', 286.0, '3h 20m', 2480.0, 'Via NH48 (Optimized Expressway)', '[{"stop":"Gurgaon Toll","eta":"45m"},{"stop":"Neemrana","eta":"1h 45m"}]'),
         ('RTE002', 'Ludhiana', 'Delhi', 315.0, '4h 45m', 3100.0, 'Via NH44 Express Highway', '[{"stop":"Ambala Cantt","eta":"1h 30m"},{"stop":"Panipat","eta":"3h 10m"}]'),
         ('RTE003', 'Delhi', 'Mumbai', 1415.0, '22h 30m', 15800.0, 'Via NE2 / NH48 Golden Quadrilateral', '[{"stop":"Udaipur","eta":"9h 00m"},{"stop":"Ahmedabad","eta":"14h 00m"}]'),
         ('RTE004', 'Amritsar', 'Bangalore', 2480.0, '38h 00m', 29500.0, 'Via NH44 North-South Corridor', '[{"stop":"Nagpur Hub","eta":"18h 00m"},{"stop":"Hyderabad","eta":"28h 00m"}]')
     ]
-    cursor.executemany("INSERT INTO routes (route_id, pickup, destination, distance_km, estimated_time, fuel_cost_est, recommended_route, stops_json) VALUES (?,?,?,?,?,?,?,?)", routes_data)
+    cursor.executemany(
+        "INSERT INTO routes (route_id, pickup, destination, distance_km, estimated_time, fuel_cost_est, recommended_route, stops_json) VALUES (?,?,?,?,?,?,?,?)",
+        routes_data,
+    )
 
-    # Seed Warehouses
     warehouses_data = [
         ('WH001', 'North Hub Freight Terminal', 'Ludhiana, Punjab', 'Harpreet Singh', '+91 9811122233', 5000.0, 3200.0, 'Active'),
         ('WH002', 'NCR Central Logistics Park', 'Gurgaon, NCR', 'Sanjay Verma', '+91 9822233344', 12000.0, 8900.0, 'Active'),
         ('WH003', 'Pink City Distribution Center', 'Jaipur, Rajasthan', 'Mohan Lal', '+91 9833344455', 4000.0, 3950.0, 'Full'),
         ('WH004', 'West Coast Gateway Depot', 'Bhiwandi, Mumbai', 'Pravin Shinde', '+91 9844455566', 15000.0, 7400.0, 'Active')
     ]
-    cursor.executemany("INSERT INTO warehouses (warehouse_id, name, location, manager_name, contact_phone, capacity_tons, current_occupancy_tons, status) VALUES (?,?,?,?,?,?,?,?)", warehouses_data)
+    cursor.executemany(
+        "INSERT INTO warehouses (warehouse_id, name, location, manager_name, contact_phone, capacity_tons, current_occupancy_tons, status) VALUES (?,?,?,?,?,?,?,?)",
+        warehouses_data,
+    )
 
-    # Seed Deliveries
+    # OTPs are hashed at rest. Seed codes are random and immediately unusable from git.
+    used_hash = generate_password_hash('USED')
+    live_hash = generate_password_hash(os.urandom(16).hex())
+    otp_expiry = (datetime.now() + timedelta(minutes=30)).strftime('%Y-%m-%d %H:%M:%S')
     deliveries_data = [
-        ('DEL001', 'SHP001', 'ABC Industries', 'DRV001', 'HR26BX4587', 'Ludhiana', 'Delhi', '2026-09-08', None, 'In Progress', '4912', 'Vikram Malhotra', 'On schedule to Delhi West Hub', None),
-        ('DEL002', 'SHP003', 'Globe Pharma Ltd', 'DRV005', 'DL8CAB6789', 'Delhi', 'Mumbai', '2026-09-05', '2026-09-05 17:45:00', 'Delivered', '8492', 'Dr. Alok Nath', 'Vaccines delivered at 4°C verified.', 'SIG_OK_DIGITAL_VERIFIED'),
-        ('DEL003', 'SHP004', 'Apex Retail Solutions', 'DRV004', 'RJ14GH9012', 'Kanpur', 'Patna', '2026-09-04', None, 'Pending', '3381', 'Rohan Gupta', 'Delayed due to heavy rainfall.', None)
+        ('DEL001', 'SHP001', 'ABC Industries', 'DRV001', 'HR26BX4587', 'Ludhiana', 'Delhi', '2026-09-08', None, 'In Progress', live_hash, 0, otp_expiry, 'Vikram Malhotra', 'On schedule to Delhi West Hub', None),
+        ('DEL002', 'SHP003', 'Globe Pharma Ltd', 'DRV005', 'DL8CAB6789', 'Delhi', 'Mumbai', '2026-09-05', '2026-09-05 17:45:00', 'Delivered', used_hash, 0, otp_expiry, 'Dr. Alok Nath', 'Vaccines delivered at 4C verified.', 'SIG_OK_DIGITAL_VERIFIED'),
+        ('DEL003', 'SHP004', 'Apex Retail Solutions', 'DRV004', 'RJ14GH9012', 'Kanpur', 'Patna', '2026-09-04', None, 'Pending', live_hash, 0, otp_expiry, 'Rohan Gupta', 'Delayed due to heavy rainfall.', None)
     ]
-    cursor.executemany("INSERT INTO deliveries (delivery_id, shipment_id, customer_name, driver_id, vehicle_reg, pickup, destination, expected_delivery, actual_delivery, status, otp_code, receiver_name, delivery_notes, signature_data) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)", deliveries_data)
+    cursor.executemany(
+        "INSERT INTO deliveries (delivery_id, shipment_id, customer_name, driver_id, vehicle_reg, pickup, destination, expected_delivery, actual_delivery, status, otp_code, otp_attempts, otp_expires_at, receiver_name, delivery_notes, signature_data) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        deliveries_data,
+    )
 
-    # Seed Payments
     payments_data = [
         ('INV-2026-001', 'SHP001', 'ABC Industries', 8500.0, 1530.0, 10030.0, 'Online Bank Transfer', 'Paid', '2026-09-05', '2026-09-05'),
         ('INV-2026-002', 'SHP002', 'Zenith Electronics', 12400.0, 2232.0, 14632.0, 'Credit Invoice', 'Pending', '2026-09-06', None),
         ('INV-2026-003', 'SHP003', 'Globe Pharma Ltd', 24500.0, 4410.0, 28910.0, 'UPI / Instant', 'Paid', '2026-09-02', '2026-09-02'),
         ('INV-2026-004', 'SHP004', 'Apex Retail Solutions', 15800.0, 2844.0, 18644.0, 'Credit Invoice', 'Pending', '2026-09-01', None)
     ]
-    cursor.executemany("INSERT INTO payments (invoice_id, shipment_id, customer_name, amount, tax_amount, total_amount, payment_method, payment_status, invoice_date, paid_date) VALUES (?,?,?,?,?,?,?,?,?,?)", payments_data)
+    cursor.executemany(
+        "INSERT INTO payments (invoice_id, shipment_id, customer_name, amount, tax_amount, total_amount, payment_method, payment_status, invoice_date, paid_date) VALUES (?,?,?,?,?,?,?,?,?,?)",
+        payments_data,
+    )
 
-    # Seed Notifications
     notifications_data = [
-        ('NOTIF001', 'ADMIN', 'Shipment In Transit', 'Shipment SHP001 (Ludhiana → Delhi) is currently in transit on NH44.', 'info', 0, '2026-09-06 08:05:00'),
-        ('NOTIF002', 'MANAGER', 'Shipment Delayed', 'Shipment SHP004 (Kanpur → Patna) reported a weather delay.', 'warning', 0, '2026-09-06 09:12:00'),
+        ('NOTIF001', 'ADMIN', 'Shipment In Transit', 'Shipment SHP001 (Ludhiana to Delhi) is currently in transit on NH44.', 'info', 0, '2026-09-06 08:05:00'),
+        ('NOTIF002', 'MANAGER', 'Shipment Delayed', 'Shipment SHP004 (Kanpur to Patna) reported a weather delay.', 'warning', 0, '2026-09-06 09:12:00'),
         ('NOTIF003', 'DRIVER', 'Trip Assigned', 'Driver Rajesh Kumar assigned to Vehicle HR26BX4587 for SHP001.', 'success', 1, '2026-09-05 10:30:00'),
-        ('NOTIF004', 'ADMIN', 'Vehicle Maintenance Due', 'Vehicle RJ14GH9012 requires scheduled engine service.', 'danger', 0, '2026-09-06 11:00:00')
+        ('NOTIF004', 'ADMIN', 'Vehicle Maintenance Due', 'Vehicle RJ14GH9012 requires scheduled engine service.', 'danger', 0, '2026-09-06 11:00:00'),
+        ('NOTIF005', 'CUSTOMER', 'Shipment Update', 'Your shipment SHP001 is in transit to Delhi.', 'info', 0, '2026-09-06 08:06:00')
     ]
-    cursor.executemany("INSERT INTO notifications (notification_id, user_role, title, message, type, is_read, timestamp) VALUES (?,?,?,?,?,?,?)", notifications_data)
+    cursor.executemany(
+        "INSERT INTO notifications (notification_id, user_role, title, message, type, is_read, timestamp) VALUES (?,?,?,?,?,?,?)",
+        notifications_data,
+    )
 
     conn.commit()
 
+
 if __name__ == '__main__':
     initialize_database()
-    print("APEX FLOW database initialized successfully!")
+    print('APEX FLOW database initialized successfully!')

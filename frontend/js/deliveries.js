@@ -13,27 +13,33 @@ function renderDeliveriesTable(deliveries) {
   const tbody = document.getElementById('deliveriesTableBody');
   if (!tbody) return;
 
-  tbody.innerHTML = deliveries.map(d => `
+  const role = (currentUser() || {}).role;
+  const canConfirm = role === 'DRIVER' || role === 'ADMIN' || role === 'MANAGER';
+
+  tbody.innerHTML = deliveries.map(d => {
+    const id = safeId(d.shipment_id);
+    const st = statusClass(d.status);
+    return `
     <tr>
-      <td><strong>${d.delivery_id}</strong></td>
-      <td><strong>${d.shipment_id}</strong></td>
-      <td>${d.customer_name}</td>
-      <td>${d.pickup} → ${d.destination}</td>
-      <td>${d.expected_delivery}</td>
-      <td><span class="badge badge-${d.status.toLowerCase().replace(/\s+/g, '-')}">${d.status}</span></td>
-      <td><strong style="letter-spacing:1px; color:var(--accent-blue);">${d.otp_code}</strong></td>
+      <td><strong>${escapeHtml(d.delivery_id)}</strong></td>
+      <td><strong>${escapeHtml(d.shipment_id)}</strong></td>
+      <td>${escapeHtml(d.customer_name)}</td>
+      <td>${escapeHtml(d.pickup)} → ${escapeHtml(d.destination)}</td>
+      <td>${escapeHtml(d.expected_delivery)}</td>
+      <td><span class="badge badge-${st}">${escapeHtml(d.status)}</span></td>
       <td>
-        ${d.status !== 'Delivered' ? `
-          <button class="btn btn-sm btn-success" onclick="openOTPConfirmModal('${d.shipment_id}', '${d.otp_code}')">Confirm Delivery</button>
-        ` : `<span style="color:var(--success); font-weight:bold;">✓ Complete</span>`}
+        ${d.status !== 'Delivered' && canConfirm ? `
+          <button class="btn btn-sm btn-success" onclick="openOTPConfirmModal('${id}')">Confirm Delivery</button>
+        ` : (d.status === 'Delivered'
+          ? `<span style="color:var(--success); font-weight:bold;">✓ Complete</span>`
+          : `<span style="color:var(--text-muted);">Awaiting driver</span>`)}
       </td>
-    </tr>
-  `).join('');
+    </tr>`;
+  }).join('');
 }
 
-function openOTPConfirmModal(shipmentId, expectedOTP) {
+function openOTPConfirmModal(shipmentId) {
   document.getElementById('otpModalShipmentId').value = shipmentId;
-  document.getElementById('otpModalExpected').innerText = expectedOTP;
   openModal('otpDeliveryModal');
 }
 

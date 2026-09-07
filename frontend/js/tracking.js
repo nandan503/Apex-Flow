@@ -21,34 +21,38 @@ function renderTrackingList(trackingList) {
   const container = document.getElementById('trackingActiveList');
   if (!container) return;
 
-  container.innerHTML = trackingList.map((t, idx) => `
-    <div class="card" style="margin-bottom: 12px; cursor: pointer; padding: 14px;" onclick="selectVehicleForTracking('${t.vehicle_id}')">
+  container.innerHTML = trackingList.map((t) => `
+    <div class="card" style="margin-bottom: 12px; cursor: pointer; padding: 14px;" onclick="selectVehicleForTracking('${safeId(t.vehicle_id)}')">
       <div style="display:flex; justify-content:space-between; align-items:center;">
         <div>
-          <strong style="font-size:15px; color:var(--primary-navy);">${t.vehicle_reg}</strong>
-          <div style="font-size:12px; color:var(--text-muted);">${t.pickup} → ${t.destination} (${t.shipment_id})</div>
+          <strong style="font-size:15px; color:var(--primary-navy);">${escapeHtml(t.vehicle_reg)}</strong>
+          <div style="font-size:12px; color:var(--text-muted);">${escapeHtml(t.pickup)} → ${escapeHtml(t.destination)} (${escapeHtml(t.shipment_id)})</div>
         </div>
-        <span class="badge badge-transit">${t.status}</span>
+        <span class="badge badge-transit">${escapeHtml(t.status)}</span>
       </div>
       <div style="display:flex; justify-content:space-between; margin-top:10px; font-size:12px;">
-        <span>⚡ ${t.speed_kmh} km/h</span>
-        <span>⏱ ETA: ${t.eta}</span>
-        <span>📍 ${t.distance_remaining_km} km left</span>
+        <span>⚡ ${escapeHtml(t.speed_kmh)} km/h</span>
+        <span>⏱ ETA: ${escapeHtml(t.eta)}</span>
+        <span>📍 ${escapeHtml(t.distance_remaining_km)} km left</span>
       </div>
     </div>
   `).join('');
 }
 
 function updateTrackingTelemetry(t) {
-  document.getElementById('trackVehReg').innerText = t.vehicle_reg;
-  document.getElementById('trackShipmentId').innerText = t.shipment_id;
-  document.getElementById('trackDriver').innerText = t.driver_name;
-  document.getElementById('trackRoute').innerText = `${t.pickup} → ${t.destination}`;
-  document.getElementById('trackSpeed').innerText = `${t.speed_kmh} km/h`;
-  document.getElementById('trackETA').innerText = t.eta;
-  document.getElementById('trackDistance').innerText = `${t.distance_remaining_km} km`;
-  document.getElementById('trackCoords').innerText = `${t.latitude}, ${t.longitude}`;
-  document.getElementById('trackProgressPercent').innerText = `${t.progress_percent}%`;
+  const setText = (id, value) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = value;
+  };
+  setText('trackVehReg', t.vehicle_reg);
+  setText('trackShipmentId', t.shipment_id);
+  setText('trackDriver', t.driver_name);
+  setText('trackRoute', `${t.pickup} → ${t.destination}`);
+  setText('trackSpeed', `${t.speed_kmh} km/h`);
+  setText('trackETA', t.eta);
+  setText('trackDistance', `${t.distance_remaining_km} km`);
+  setText('trackCoords', `${t.latitude}, ${t.longitude}`);
+  setText('trackProgressPercent', `${t.progress_percent}%`);
 
   const progressBar = document.getElementById('trackProgressBar');
   if (progressBar) progressBar.style.width = `${t.progress_percent}%`;
@@ -58,15 +62,13 @@ function drawSimulatedMapCanvas(t) {
   const canvas = document.getElementById('trackingMapCanvas');
   if (!canvas) return;
   const ctx = canvas.getContext('2d');
-  
+
   canvas.width = canvas.parentElement.clientWidth || 700;
   canvas.height = 360;
 
-  // Background map texture
   ctx.fillStyle = '#eaf2f8';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-  // Draw grid roads
   ctx.strokeStyle = '#d0dfed';
   ctx.lineWidth = 1;
   for (let x = 0; x < canvas.width; x += 40) {
@@ -76,7 +78,6 @@ function drawSimulatedMapCanvas(t) {
     ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
   }
 
-  // Draw Highway Route line
   const p1 = { x: 80, y: 80 };
   const p2 = { x: canvas.width - 80, y: canvas.height - 80 };
 
@@ -88,29 +89,25 @@ function drawSimulatedMapCanvas(t) {
   ctx.lineTo(p2.x, p2.y);
   ctx.stroke();
 
-  // Draw Origin & Destination nodes
   ctx.fillStyle = '#08a75a';
   ctx.beginPath(); ctx.arc(p1.x, p1.y, 10, 0, Math.PI * 2); ctx.fill();
-  ctx.fillStyle = '#ffffff'; ctx.font = '10px Arial'; ctx.fillText(t.pickup, p1.x - 15, p1.y - 14);
+  ctx.fillStyle = '#14213d'; ctx.font = '10px Arial'; ctx.fillText(String(t.pickup || ''), p1.x - 15, p1.y - 14);
 
   ctx.fillStyle = '#ef3348';
   ctx.beginPath(); ctx.arc(p2.x, p2.y, 10, 0, Math.PI * 2); ctx.fill();
-  ctx.fillStyle = '#14213d'; ctx.fillText(t.destination, p2.x - 15, p2.y + 24);
+  ctx.fillStyle = '#14213d'; ctx.fillText(String(t.destination || ''), p2.x - 15, p2.y + 24);
 
-  // Calculate current vehicle position on canvas line
   const factor = (t.progress_percent || 50) / 100.0;
   const vx = p1.x + (p2.x - p1.x) * factor;
   const vy = p1.y + (p2.y - p1.y) * factor;
 
-  // Draw Vehicle Marker
   ctx.fillStyle = '#062b57';
   ctx.beginPath(); ctx.arc(vx, vy, 14, 0, Math.PI * 2); ctx.fill();
-  ctx.fillStyle = '#ffffff'; ctx.font = '14px Arial'; ctx.fillText('🚚', vx - 9, vy + 5);
 }
 
 async function selectVehicleForTracking(vehicleId) {
   try {
-    const res = await fetchAPI(`/tracking/${vehicleId}`);
+    const res = await fetchAPI(`/tracking/${encodeURIComponent(vehicleId)}`);
     if (res.success && res.data) {
       updateTrackingTelemetry(res.data);
       drawSimulatedMapCanvas(res.data);
@@ -122,7 +119,6 @@ async function selectVehicleForTracking(vehicleId) {
 document.addEventListener('DOMContentLoaded', () => {
   if (document.getElementById('trackingMapCanvas')) {
     loadLiveTrackingData();
-    // Auto refresh GPS telemetry every 4 seconds
     trackingInterval = setInterval(loadLiveTrackingData, 4000);
   }
 });

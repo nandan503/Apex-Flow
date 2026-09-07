@@ -6,9 +6,11 @@
 **Method:** Source review + live exploit against Flask test client (same code paths as production)  
 **Build reviewed:** branch `arena/01a07d2b-apex-flow` @ `5c72254`
 
+> **Remediation (follow-up on this branch):** Findings F1–F12 have been implemented in code: service-layer authz + identity mapping, delivery/payment state machine, working login rate limit, hashed/single-use OTPs, XSS encoding, Postgres fail-closed, connection context manager, security headers, pinned deps, and `tests/test_security.py` gates. Re-run those tests before calling any environment production.
+
 ---
 
-## Verdict: **NO-GO for production**
+## Original verdict: **NO-GO for production** (pre-remediation snapshot)
 
 Do not expose this application to real customers, real invoices, or a public URL. Authentication exists; **authorization does not**. A logged-in Customer or Driver can read fleet PII, live tracking, other customers' cargo, and company revenue; can confirm other parties' deliveries with OTPs that are committed to git; and a Driver can mark any invoice **Paid** by setting shipment status to `Delivered`. A previous AI security pass (comments `F-02`…`F-13`, Semgrep, pre-commit) patched several *look-correct* issues and left the control that actually matters — object-level access control — broken.
 

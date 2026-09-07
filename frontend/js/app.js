@@ -2,19 +2,60 @@
 
 const API_BASE = '/api';
 
-// API Fetch Helper
+const NAV_BY_ROLE = {
+  CUSTOMER: [
+    'dashboard.html', 'shipments.html', 'tracking.html',
+    'deliveries.html', 'notifications.html', 'settings.html', 'payments.html'
+  ],
+  DRIVER: [
+    'dashboard.html', 'shipments.html', 'tracking.html', 'deliveries.html',
+    'routes.html', 'notifications.html', 'settings.html'
+  ]
+};
+
+function escapeHtml(value) {
+  if (value === null || value === undefined) return '';
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function safeId(value) {
+  return String(value || '').replace(/[^A-Za-z0-9_-]/g, '');
+}
+
+function statusClass(status) {
+  return String(status || '')
+    .toLowerCase()
+    .replace(/\s+/g, '-')
+    .replace(/[^a-z0-9-]/g, '');
+}
+
+function currentUser() {
+  try {
+    return JSON.parse(localStorage.getItem('apexflow_user') || 'null');
+  } catch (e) {
+    return null;
+  }
+}
+
 async function fetchAPI(endpoint, options = {}) {
+  const { headers: extraHeaders, ...rest } = options;
   const config = {
+    credentials: 'same-origin',
     headers: {
       'Content-Type': 'application/json',
-      ...options.headers
+      ...(extraHeaders || {})
     },
-    ...options
+    ...rest
   };
 
   try {
     const response = await fetch(`${API_BASE}${endpoint}`, config);
-    const result = await response.json();
+    const result = await response.json().catch(() => ({}));
 
     if (!response.ok) {
       throw new Error(result.message || 'API error occurred');
@@ -27,7 +68,6 @@ async function fetchAPI(endpoint, options = {}) {
   }
 }
 
-// Toast Notification Manager
 function showToast(message, type = 'info') {
   let container = document.getElementById('toastContainer');
   if (!container) {
@@ -39,13 +79,17 @@ function showToast(message, type = 'info') {
 
   const toast = document.createElement('div');
   toast.className = `toast ${type}`;
-  
-  const icon = type === 'success' ? '✓' : (type === 'danger' ? '⚠' : 'ℹ');
-  toast.innerHTML = `
-    <span style="font-weight:bold; font-size:16px;">${icon}</span>
-    <span>${message}</span>
-  `;
 
+  const icon = document.createElement('span');
+  icon.style.fontWeight = 'bold';
+  icon.style.fontSize = '16px';
+  icon.textContent = type === 'success' ? '✓' : (type === 'danger' ? '⚠' : 'ℹ');
+
+  const text = document.createElement('span');
+  text.textContent = message || '';
+
+  toast.appendChild(icon);
+  toast.appendChild(text);
   container.appendChild(toast);
 
   setTimeout(() => {
@@ -55,48 +99,39 @@ function showToast(message, type = 'info') {
   }, 3500);
 }
 
-// Modal Helpers
 function openModal(modalId) {
   const modal = document.getElementById(modalId);
-  if (modal) {
-    modal.classList.add('active');
-  }
+  if (modal) modal.classList.add('active');
 }
 
 function closeModal(modalId) {
   const modal = document.getElementById(modalId);
-  if (modal) {
-    modal.classList.remove('active');
-  }
+  if (modal) modal.classList.remove('active');
 }
 
-// Session & Auth UI Check
 async function initGlobalApp() {
   try {
     const res = await fetchAPI('/auth/me');
     if (res.success && res.data) {
       const user = res.data;
       localStorage.setItem('apexflow_user', JSON.stringify(user));
-      
+
       const userNameEl = document.getElementById('topbarUserName');
       const userRoleEl = document.getElementById('topbarUserRole');
       const userAvatarEl = document.getElementById('topbarUserAvatar');
 
-      if (userNameEl) userNameEl.innerText = user.name;
-      if (userRoleEl) userRoleEl.innerText = user.role;
-      if (userAvatarEl) userAvatarEl.innerText = user.name.charAt(0).toUpperCase();
+      if (userNameEl) userNameEl.textContent = user.name;
+      if (userRoleEl) userRoleEl.textContent = user.role;
+      if (userAvatarEl) userAvatarEl.textContent = (user.name || '?').charAt(0).toUpperCase();
 
-      // Check role restrictions if needed
       applyRoleRestrictions(user.role);
     }
   } catch (err) {
-    // If not logged in and not on login page, redirect
     if (!window.location.pathname.includes('login.html')) {
       window.location.href = '/login.html';
     }
   }
 
-  // Load unread notification badge count
   loadNotificationBadge();
 }
 
@@ -107,20 +142,34 @@ async function loadNotificationBadge() {
       const unreadCount = res.data.filter(n => !n.is_read).length;
       const countEl = document.getElementById('notifCount');
       if (countEl) {
-        countEl.innerText = unreadCount;
+        countEl.textContent = unreadCount;
         countEl.style.display = unreadCount > 0 ? 'inline-block' : 'none';
       }
     }
   } catch (e) {
-    // Silently ignore if not loaded
+    // ignore
   }
 }
 
 function applyRoleRestrictions(role) {
-  // Hide admin-only buttons for driver or customer roles if applicable
+  const adminOnlyBtns = document.querySelectorAll('.admin-only');
   if (role === 'DRIVER' || role === 'CUSTOMER') {
-    const adminOnlyBtns = document.querySelectorAll('.admin-only');
-    adminOnlyBtns.forEach(btn => btn.style.display = 'none');
+    adminOnlyBtns.forEach(btn => { btn.style.display = 'none'; });
+  }
+
+  const allowed = NAV_BY_ROLE[role];
+  if (allowed) {
+    document.querySelectorAll('.menu a').forEach(link => {
+      const href = (link.getAttribute('href') || '').split('/').pop();
+      if (href && !allowed.includes(href)) {
+        const li = link.closest('li');
+        if (li) li.style.display = 'none';
+      }
+    });
+    const page = (window.location.pathname.split('/').pop() || 'dashboard.html');
+    if (page.endsWith('.html') && page !== 'login.html' && !allowed.includes(page)) {
+      window.location.href = '/dashboard.html';
+    }
   }
 }
 
@@ -129,13 +178,12 @@ async function handleLogout() {
     await fetchAPI('/auth/logout', { method: 'POST' });
     localStorage.removeItem('apexflow_user');
     showToast('Logged out successfully', 'info');
-    setTimeout(() => window.location.href = '/login.html', 500);
+    setTimeout(() => { window.location.href = '/login.html'; }, 500);
   } catch (err) {
     window.location.href = '/login.html';
   }
 }
 
-// Global Filter/Search Helper for HTML Tables
 function setupTableSearch(inputId, tableId) {
   const input = document.getElementById(inputId);
   if (!input) return;
@@ -143,14 +191,12 @@ function setupTableSearch(inputId, tableId) {
   input.addEventListener('keyup', function () {
     const value = this.value.toLowerCase();
     const rows = document.querySelectorAll(`#${tableId} tbody tr`);
-
     rows.forEach(row => {
       row.style.display = row.innerText.toLowerCase().includes(value) ? '' : 'none';
     });
   });
 }
 
-// Setup Mobile Drawer Toggle Navigation
 function setupMobileDrawer() {
   const toggleBtn = document.getElementById('sidebarToggleBtn');
   const sidebar = document.querySelector('.sidebar');
@@ -180,17 +226,12 @@ function setupMobileDrawer() {
     });
   }
 
-  if (overlay) {
-    overlay.addEventListener('click', closeSidebar);
-  }
+  if (overlay) overlay.addEventListener('click', closeSidebar);
 
-  // Auto-close on menu link tap for mobile
   const menuLinks = document.querySelectorAll('.menu a');
   menuLinks.forEach(link => {
     link.addEventListener('click', () => {
-      if (window.innerWidth <= 850) {
-        closeSidebar();
-      }
+      if (window.innerWidth <= 850) closeSidebar();
     });
   });
 }
@@ -201,4 +242,3 @@ document.addEventListener('DOMContentLoaded', () => {
     initGlobalApp();
   }
 });
-

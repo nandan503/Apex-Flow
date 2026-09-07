@@ -78,7 +78,6 @@
                 <th>Route</th>
                 <th>Expected Delivery</th>
                 <th>Status</th>
-                <th>OTP Code</th>
                 <th>Verification</th>
               </tr>
             </thead>
@@ -103,11 +102,11 @@
       <input type="hidden" id="otpModalShipmentId">
       <div class="modal-body">
         <div style="background:var(--light-blue); padding:12px; border-radius:var(--radius-sm); margin-bottom:16px; font-size:12px;">
-          Expected Receiver Security OTP: <strong id="otpModalExpected" style="color:var(--accent-blue); font-weight:800; font-size:16px;">--</strong>
+          Enter the 6-digit code provided to the receiver. The code is never displayed in this portal.
         </div>
         <div class="form-group">
-          <label>Enter 4-Digit OTP Code</label>
-          <input type="text" id="otpInputCode" class="form-control" placeholder="e.g. 4912" required style="font-size:18px; font-weight:700; text-align:center; letter-spacing:4px;">
+          <label>Enter 6-Digit OTP Code</label>
+          <input type="text" id="otpInputCode" class="form-control" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="••••••" required style="font-size:18px; font-weight:700; text-align:center; letter-spacing:4px;">
         </div>
         <div class="form-group">
           <label>Receiver Name</label>

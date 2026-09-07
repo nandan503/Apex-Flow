@@ -73,9 +73,11 @@ Output:
 
 Open your browser and navigate to: `http://localhost:5050` or `http://127.0.0.1:5050`.
 
-### 🔑 Demo Login Credentials:
+### 🔑 Local development credentials (never shipped in the login UI)
 
-| Role | Email | Password |
+These exist only when `FLASK_ENV` is not `production` **and** the corresponding `SEED_*_PASSWORD` env vars are unset. They are rejected at boot in production. Do not use them on a public URL.
+
+| Role | Email | Password (dev default) |
 | :--- | :--- | :--- |
 | **System Admin** | `admin@apexflow.com` | `Admin@123` |
 | **Logistics Manager** | `manager@apexflow.com` | `Manager@123` |
@@ -229,10 +231,15 @@ APEX FLOW has been engineered and tested across standard mobile, tablet, laptop,
 
 ## 🔒 8. Security & Best Practices
 
-- **Zero Hardcoded Secrets**: All API keys, secret keys, and database credentials are read from environment variables.
-- **Production Server**: Runs Gunicorn WSGI server in production instead of Flask's built-in development server.
-- **SQL Injection Prevention**: All queries use parameterized statements across both SQLite and PostgreSQL.
-- **Password Security**: Passwords hashed using `werkzeug.security` (`generate_password_hash` & `check_password_hash`).
+- **Authorization is enforced in the service layer**, not only with `@login_required`. Customers see their `customer_id` rows; drivers see assigned jobs; staff see the fleet.
+- **Delivery ≠ payment.** Marking a shipment delivered (OTP) does not flip invoices to Paid. Collect via `POST /api/payments/<invoice_id>/collect`.
+- **OTPs** are 6-digit CSPRNG values, hashed at rest, single-use, TTL 30 minutes, 5-attempt lockout. Seed OTPs from git (`4912`, …) are invalid.
+- **Login rate limit** is 5/minute, applied with `@limiter.limit` on the view Flask actually calls. Set `REDIS_URL` in production so workers share counters.
+- **Demo passwords are not on the login page.** Production boot refuses documented defaults (`Admin@123`, …).
+- **Passwords hashed** with `werkzeug.security`. **SQL** is parameterized. Session cookies are `HttpOnly`, `SameSite=Lax`, `Secure` in production.
+- **PostgreSQL fail-closed:** if `DATABASE_URL` is set and the connection fails, the app does not fall back to SQLite.
+- **Security headers:** `CSP`, `X-Frame-Options`, `nosniff`, `Referrer-Policy`, `HSTS` (production).
+- Run `pytest` before every release. Gates live in `tests/test_security.py`.
 
 ---
 

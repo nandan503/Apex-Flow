@@ -24,47 +24,51 @@ function renderShipmentsTable(shipments) {
     return;
   }
 
-  tbody.innerHTML = shipments.map(s => `
+  const role = (currentUser() || {}).role;
+  const canMutate = role === 'ADMIN' || role === 'MANAGER' || role === 'DRIVER';
+  const canDelete = role === 'ADMIN';
+
+  tbody.innerHTML = shipments.map(s => {
+    const id = safeId(s.shipment_id);
+    const st = statusClass(s.status);
+    const pay = statusClass(s.payment_status);
+    return `
     <tr>
-      <td><strong>${s.shipment_id}</strong></td>
-      <td>${s.customer_name}</td>
-      <td>${s.pickup_location} → ${s.destination}</td>
-      <td>${s.goods_type}</td>
-      <td>${s.weight_kg} kg</td>
-      <td>${s.vehicle_reg || 'Unassigned'}</td>
-      <td>${s.driver_name || 'Unassigned'}</td>
-      <td>${s.booking_date}</td>
-      <td>${s.expected_delivery}</td>
-      <td><span class="badge badge-${s.status.toLowerCase().replace(/\s+/g, '-')}">${s.status}</span></td>
-      <td><span class="badge badge-${s.payment_status.toLowerCase()}">${s.payment_status}</span></td>
+      <td><strong>${escapeHtml(s.shipment_id)}</strong></td>
+      <td>${escapeHtml(s.customer_name)}</td>
+      <td>${escapeHtml(s.pickup_location)} → ${escapeHtml(s.destination)}</td>
+      <td>${escapeHtml(s.goods_type)}</td>
+      <td>${escapeHtml(s.weight_kg)} kg</td>
+      <td>${escapeHtml(s.vehicle_reg || 'Unassigned')}</td>
+      <td>${escapeHtml(s.driver_name || 'Unassigned')}</td>
+      <td>${escapeHtml(s.booking_date)}</td>
+      <td>${escapeHtml(s.expected_delivery)}</td>
+      <td><span class="badge badge-${st}">${escapeHtml(s.status)}</span></td>
+      <td><span class="badge badge-${pay}">${escapeHtml(s.payment_status)}</span></td>
       <td>
         <div class="action-btns">
-          <button class="btn-icon" title="View Details & Timeline" onclick="viewShipmentTimeline('${s.shipment_id}')">👁</button>
-          <button class="btn-icon" title="Update Status" onclick="openStatusModal('${s.shipment_id}', '${s.status}')">🔄</button>
-          <button class="btn-icon" title="Delete Shipment" onclick="confirmDeleteShipment('${s.shipment_id}')">🗑</button>
+          <button class="btn-icon" title="View Details & Timeline" onclick="viewShipmentTimeline('${id}')">👁</button>
+          ${canMutate ? `<button class="btn-icon" title="Update Status" onclick="openStatusModal('${id}', '${st}')">🔄</button>` : ''}
+          ${canDelete ? `<button class="btn-icon" title="Delete Shipment" onclick="confirmDeleteShipment('${id}')">🗑</button>` : ''}
         </div>
       </td>
-    </tr>
-  `).join('');
+    </tr>`;
+  }).join('');
 }
 
 async function handleCreateShipment(event) {
   event.preventDefault();
-  
+
   const payload = {
     customer_name: document.getElementById('shipmentCustomer').value,
     pickup_location: document.getElementById('shipmentPickup').value,
     destination: document.getElementById('shipmentDestination').value,
     goods_type: document.getElementById('shipmentGoodsType').value,
     weight_kg: parseFloat(document.getElementById('shipmentWeight').value) || 1000,
-    quantity: parseInt(document.getElementById('shipmentQuantity').value) || 1,
-    vehicle_reg: document.getElementById('shipmentVehicle').value,
-    driver_name: document.getElementById('shipmentDriver').value,
+    quantity: parseInt(document.getElementById('shipmentQuantity').value, 10) || 1,
     booking_date: document.getElementById('shipmentBookingDate').value,
     expected_delivery: document.getElementById('shipmentDeliveryDate').value,
-    shipping_cost: parseFloat(document.getElementById('shipmentCost').value) || 5000,
     payment_method: document.getElementById('shipmentPaymentMethod').value,
-    payment_status: document.getElementById('shipmentPaymentStatus').value,
     special_instructions: document.getElementById('shipmentInstructions').value
   };
 
@@ -87,23 +91,40 @@ async function handleCreateShipment(event) {
 
 async function viewShipmentTimeline(shipmentId) {
   try {
-    const res = await fetchAPI(`/shipments/${shipmentId}`);
+    const res = await fetchAPI(`/shipments/${encodeURIComponent(shipmentId)}`);
     if (res.success && res.data) {
       const s = res.data;
-      document.getElementById('timelineShipmentId').innerText = s.shipment_id;
-      document.getElementById('timelineCustomer').innerText = s.customer_name;
-      document.getElementById('timelineRoute').innerText = `${s.pickup_location} → ${s.destination}`;
-      document.getElementById('timelineStatus').innerText = s.status;
+      document.getElementById('timelineShipmentId').textContent = s.shipment_id;
+      document.getElementById('timelineCustomer').textContent = s.customer_name;
+      document.getElementById('timelineRoute').textContent = `${s.pickup_location} → ${s.destination}`;
+      document.getElementById('timelineStatus').textContent = s.status;
 
       const historyContainer = document.getElementById('timelineHistoryList');
       if (historyContainer) {
-        historyContainer.innerHTML = (s.history || []).map(h => `
-          <div style="margin-bottom: 16px; position: relative; padding-left: 24px; border-left: 3px solid var(--accent-blue);">
-            <div style="font-weight: 700; font-size: 13px;">${h.status}</div>
-            <div style="font-size: 11px; color: var(--text-muted);">${h.timestamp} - ${h.location} (${h.updated_by})</div>
-            <div style="font-size: 12px; margin-top: 2px;">${h.notes || ''}</div>
-          </div>
-        `).join('');
+        historyContainer.textContent = '';
+        (s.history || []).forEach(h => {
+          const wrap = document.createElement('div');
+          wrap.style.marginBottom = '16px';
+          wrap.style.position = 'relative';
+          wrap.style.paddingLeft = '24px';
+          wrap.style.borderLeft = '3px solid var(--accent-blue)';
+          const st = document.createElement('div');
+          st.style.fontWeight = '700';
+          st.style.fontSize = '13px';
+          st.textContent = h.status;
+          const meta = document.createElement('div');
+          meta.style.fontSize = '11px';
+          meta.style.color = 'var(--text-muted)';
+          meta.textContent = `${h.timestamp} - ${h.location} (${h.updated_by})`;
+          const notes = document.createElement('div');
+          notes.style.fontSize = '12px';
+          notes.style.marginTop = '2px';
+          notes.textContent = h.notes || '';
+          wrap.appendChild(st);
+          wrap.appendChild(meta);
+          wrap.appendChild(notes);
+          historyContainer.appendChild(wrap);
+        });
       }
 
       openModal('timelineModal');
@@ -115,7 +136,16 @@ async function viewShipmentTimeline(shipmentId) {
 
 function openStatusModal(shipmentId, currentStatus) {
   document.getElementById('statusModalShipmentId').value = shipmentId;
-  document.getElementById('statusModalSelect').value = currentStatus;
+  const select = document.getElementById('statusModalSelect');
+  if (select) {
+    const wanted = String(currentStatus || '').replace(/-/g, ' ');
+    for (const opt of select.options) {
+      if (opt.value.toLowerCase() === wanted.toLowerCase()) {
+        select.value = opt.value;
+        break;
+      }
+    }
+  }
   openModal('updateStatusModal');
 }
 
@@ -127,7 +157,7 @@ async function handleUpdateStatusSubmit(event) {
   const notes = document.getElementById('statusModalNotes').value;
 
   try {
-    const res = await fetchAPI(`/shipments/${shipmentId}/status`, {
+    const res = await fetchAPI(`/shipments/${encodeURIComponent(shipmentId)}/status`, {
       method: 'PUT',
       body: JSON.stringify({ status: newStatus, location, notes })
     });
@@ -145,7 +175,7 @@ async function handleUpdateStatusSubmit(event) {
 async function confirmDeleteShipment(shipmentId) {
   if (confirm(`Are you sure you want to delete shipment ${shipmentId}?`)) {
     try {
-      const res = await fetchAPI(`/shipments/${shipmentId}`, { method: 'DELETE' });
+      const res = await fetchAPI(`/shipments/${encodeURIComponent(shipmentId)}`, { method: 'DELETE' });
       if (res.success) {
         showToast(res.message || 'Shipment deleted successfully', 'success');
         loadShipments();
