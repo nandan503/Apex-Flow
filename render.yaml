@@ -1,0 +1,49 @@
+
+# APEX FLOW — Render Infrastructure as Code
+# https://render.com/docs/blueprint-spec
+#
+# ⚠️  After committing this file, sync it in the Render dashboard:
+#     Dashboard → apex-flow → Settings → "Sync from render.yaml"
+#
+# SECRET VALUES must be set in the Render dashboard environment.
+# This file must NEVER contain actual secret values.
+
+services:
+  - type: web
+    name: apex-flow
+    runtime: python
+    region: oregon               # Change if your service is in a different region
+
+    # Use the Procfile command — direct WSGI object, NO factory pattern.
+    # backend/app.py exports `app = Flask(...)` directly.
+    startCommand: gunicorn backend.app:app --bind 0.0.0.0:$PORT
+
+    # Render auto-deploys on push to this branch.
+    branch: main
+    autoDeploy: true
+
+    healthCheckPath: /           # Flask serves index.html on /
+
+    envVars:
+      # ── Required in production ─────────────────────────────────────────────
+      - key: SECRET_KEY
+        sync: false              # Must be set manually in Render dashboard
+
+      # ── Optional — defaults used if not set (dev-only fallbacks) ──────────
+      - key: FLASK_ENV
+        value: production
+
+      # ── Database — optional PostgreSQL (SQLite used if not set) ──────────
+      - key: DATABASE_URL
+        sync: false              # Set manually if using PostgreSQL
+
+      # ── Seed passwords — required only on first deploy for DB seeding ─────
+      # Set these in Render dashboard → Environment. Remove after first deploy.
+      - key: SEED_ADMIN_PASSWORD
+        sync: false
+      - key: SEED_MANAGER_PASSWORD
+        sync: false
+      - key: SEED_DRIVER_PASSWORD
+        sync: false
+      - key: SEED_CUSTOMER_PASSWORD
+        sync: false
