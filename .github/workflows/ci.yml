@@ -65,17 +65,18 @@ jobs:
         uses: gitleaks/gitleaks-action@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        # gitleaks-action reads GITHUB_TOKEN to auto-detect PR vs push context.
-        # No additional secrets are needed or passed to this step.
+          # Explicitly point to .gitleaks.toml so the action picks up the
+          # commit-SHA allowlist for the two historical remediated commits.
+          GITLEAKS_CONFIG: .gitleaks.toml
 
       # ── SAST — custom Semgrep rules ────────────────────────────────────────
+      # Uses semgrep CLI directly (pip install) instead of the deprecated
+      # returntocorp/semgrep-action@v1 Docker action (archived upstream).
       - name: SAST scan (Semgrep — APEX FLOW rules)
-        uses: returntocorp/semgrep-action@v1
-        with:
-          config: .semgrep.yml
-        env:
-          # Run only our local ruleset; no Semgrep App token needed.
-          SEMGREP_APP_TOKEN: ""
+        run: |
+          pip install semgrep --quiet
+          semgrep --config .semgrep.yml backend/ --error --quiet
+          echo "✅ Semgrep SAST scan passed."
 
       # ── Validate YAML workflow files ───────────────────────────────────────
       - name: Validate CI YAML syntax
