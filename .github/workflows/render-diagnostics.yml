@@ -1,0 +1,60 @@
+# Render observability / diagnostics for APEX Flow.
+#
+# Manually triggered (workflow_dispatch) read-only collector. It does NOT
+# deploy anything. It inspects Render deployment state through the official
+# Render API, probes the canonical production origin
+# (https://apex.viability.in) using this repository's real health endpoints
+# (/health/live, /health/ready, /), and uploads a sanitized diagnostics
+# artifact. Full contract: docs/RENDER_DIAGNOSTICS.md
+#
+# Security notes:
+# - The only secret consumed is RENDER_API_TOKEN, resolved from the existing
+#   "Production" GitHub environment via the secrets context. It is passed to
+#   exactly one step, as a process environment variable, and never printed.
+# - The collector issues GET requests only and never requests Render
+#   environment variable values, secret files or connection info.
+# - Artifacts and the step summary pass through scripts/render_sanitize.py
+#   plus a literal token guard before being written or uploaded.
+# - Do not enable runner step/debug logging for this workflow.
+name: Render diagnostics
+
+on:
+  workflow_dispatch:
+    inputs:
+      lookback_minutes:
+        description: 'Render log lookback window in minutes (5-1440)'
+        required: false
+        default: '90'
+
+permissions:
+  contents: read
+
+jobs:
+  render-diagnostics:
+    name: Collect sanitized Render diagnostics
+    runs-on: ubuntu-latest
+    environment: Production
+    timeout-minutes: 15
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Collect Render diagnostics and canonical health
+        env:
+          RENDER_API_TOKEN: ${{ secrets.RENDER_API_TOKEN }}
+          RENDER_LOG_LOOKBACK_MINUTES: ${{ inputs.lookback_minutes }}
+        run: python scripts/render_diagnostics.py --output diagnostics
+
+      - name: Upload sanitized diagnostics artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: render-diagnostics-${{ github.run_id }}-${{ github.run_attempt }}
+          path: diagnostics/
+          if-no-files-found: warn
+          retention-days: 14
