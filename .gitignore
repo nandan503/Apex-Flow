@@ -99,3 +99,11 @@ htmlcov/
 # It contains the hook *source* files. Actual active hooks live in .git/hooks/
 # and are installed by running: bash scripts/install-hooks.sh
 # ──────────────────────────────────────────────────────────────────────────────
+
+# ── Root-level junk files (empty placeholders, C headers) ──────────────────
+HImanshu
+index.h
+html.h
+# Note: index.html at repo root is NOT the Flask entry point.
+# Flask serves from frontend/ — a root index.html will never be served.
+/index.html
