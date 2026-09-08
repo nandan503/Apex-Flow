@@ -1,10 +1,11 @@
 import math
 import time
+from flask import current_app
 
 from backend.database import db_session
 from backend.models import rows_to_list
 from backend.authz import Caller, shipment_visible
-from backend.services import SHIPMENT_COLUMNS
+from backend.services import SHIPMENT_COLUMNS, _shipment_scope_sql, TRACKING_HARD_CAP
 
 CITY_COORDINATES = {
     'Delhi': (28.6139, 77.2090),
@@ -39,6 +40,7 @@ def _tracking_payload(s):
     mins = eta_minutes % 60
     eta_str = f"{hours}h {mins}m" if hours > 0 else f"{mins} mins"
     return {
+        'simulated': True,
         'shipment_id': s['shipment_id'],
         'vehicle_id': s['vehicle_id'],
         'vehicle_reg': s['vehicle_reg'],
@@ -57,11 +59,16 @@ def _tracking_payload(s):
 
 
 def get_live_tracking_data(caller: Caller):
-    with db_session() as conn:
+    if current_app.config['APP_ENV'] == 'production':
+        from backend.errors import AppError
+        raise AppError('No live telemetry provider configured', 503, 'TELEMETRY_UNAVAILABLE')
+    scope, params = _shipment_scope_sql(caller)
+    with db_session(caller) as conn:
         cursor = conn.cursor()
         cursor.execute(
             f"SELECT {SHIPMENT_COLUMNS} FROM shipments "
-            "WHERE status IN ('In Transit', 'Picked Up', 'Out for Delivery')"
+            f"WHERE status IN ('In Transit', 'Picked Up', 'Out for Delivery'){scope} LIMIT %s",
+            params + [TRACKING_HARD_CAP],
         )
         shipments = rows_to_list(cursor.fetchall())
     visible = [s for s in shipments if shipment_visible(caller, s)]

@@ -24,11 +24,6 @@ rules:
           def $FUNC(...):
               ...
       - pattern-not: |
-          @$BP.route($PATH, ...)
-          @limiter.limit(...)
-          def $FUNC(...):
-              ...
-      - pattern-not: |
           @$BP.route("/auth/login", ...)
           def $FUNC(...):
               ...
@@ -123,3 +118,24 @@ rules:
     paths:
       include:
         - backend/
+
+  - id: apexflow-tenant-context-required
+    message: Tenant data sessions must receive an explicit authorized Caller.
+    languages: [python]
+    severity: ERROR
+    pattern: db_session()
+    paths:
+      include:
+        - backend/
+
+  - id: apexflow-no-global-domain-session
+    message: Domain services must use tenant db_session, never global identity_session.
+    languages: [python]
+    severity: ERROR
+    pattern: identity_session(...)
+    paths:
+      include:
+        - backend/services.py
+        - backend/reports.py
+        - backend/tracking.py
+        - backend/outbox.py

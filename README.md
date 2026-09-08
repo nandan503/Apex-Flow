@@ -1,249 +1,135 @@
-# 🚀 APEX FLOW - Smart Transport & Logistics System
-> **Tagline:** *"Smarter Logistics. Faster Tomorrow."*
+# APEX Flow
 
-APEX FLOW is an enterprise-grade, cross-device accessible transport and fleet management web application. Designed for seamless operation on **Android phones, iPhones, iPads, Tablets, Windows PCs, MacBooks, and Linux PCs**, APEX FLOW adapts dynamically to any screen resolution without depending on a personal computer's `localhost`.
+Flask logistics application with a PostgreSQL security and transaction baseline.
+The existing HTML/JavaScript UI and domain services are retained; persistence,
+tenancy, sessions, mutation replay and database lifecycle have been reengineered.
 
----
+**This is not a claim of production readiness or end-to-end high availability.**
+No cloud providers, database replicas or object-storage replication have been
+provisioned or failover-tested by this change. See the release blockers below.
 
-## 🌟 Key Features & Cross-Device Compatibility
+## Architecture
 
-- **Universal Accessibility**: Accessible via standard web browsers across mobile phones, tablets, laptops, and desktop computers.
-- **Mobile Responsive UI**:
-  - Auto-collapsing slide-out drawer navigation (Hamburger menu) for touch screens (`< 850px`).
-  - Adaptive 1 to 4-column dashboard KPI cards grid.
-  - Horizontally scrollable data tables (`.table-responsive`) with zero page overflow.
-  - 44px+ touch-friendly tap targets for buttons, inputs, and modals.
-- **Production Dual Database Engine**:
-  - Zero-config **SQLite** for instant local development.
-  - Cloud-ready **PostgreSQL** compatibility for online multi-device synchronization.
-- **RESTful API Backend**: Built with Python Flask, providing structured JSON REST endpoints for auth, shipments, vehicles, drivers, tracking, routes, reports, and notifications.
-
----
-
-## 🛠️ Tech Stack
-
-- **Frontend**: HTML5, Vanilla CSS3 (CSS Variables, Flexbox, Grid, Media Queries), Vanilla JavaScript (ES6+ fetch API).
-- **Backend**: Python 3.9+ Flask, Gunicorn WSGI Server, Flask-CORS, Werkzeug.
-- **Database Engine**: Dual SQLite / PostgreSQL abstraction layer (`backend/database.py`).
-
----
-
-## 💻 1. Local Installation
-
-Follow these steps to set up and run APEX FLOW on your local computer:
-
-```bash
-# 1. Clone the repository or navigate to project folder
-cd /path/to/HImanshu
-
-# 2. Create a virtual environment
-python3 -m venv venv
-
-# 3. Activate the virtual environment
-# On macOS / Linux:
-source venv/bin/activate
-# On Windows (Command Prompt):
-# venv\Scripts\activate.bat
-# On Windows (PowerShell):
-# .\venv\Scripts\Activate.ps1
-
-# 4. Install production dependencies
-pip install -r requirements.txt
+```text
+Internet → Cloudflare (operator-managed routing / origin protection)
+                 ↓
+       interchangeable stateless Flask compute
+       Northflank / Render / Koyeb / emergency provider
+                 ↓
+       shared PostgreSQL — source of truth
+       Redis — not required; currently unused
+       object storage — required before adding durable file features
 ```
 
----
+There is no provider detection in application code. All compute instances must
+use the same database, cookie signing secret, replay keyring and outbox key.
+Cookies carry a random session handle; sessions, memberships, rate-limit buckets,
+business records, idempotency results, audit events and outbox state live in PostgreSQL.
 
-## 🧪 2. Local Testing
+## Read first
 
-To run the application locally for testing:
+- [Discovery and original operation traces](docs/DISCOVERY.md)
+- [Security model and authorization matrix](docs/SECURITY_MODEL.md)
+- [Transaction, retry and external-delivery contracts](docs/DATA_CONTRACTS.md)
+- [Configuration, migration and operations runbook](docs/OPERATIONS.md)
+- [Verification evidence and remaining gates](SECURITY_AUDIT.md)
 
-```bash
-python backend/app.py
+## Setup (explicit database lifecycle)
+
+Python 3.11 and PostgreSQL 16 are the tested baseline. **SQLite is no longer a
+supported alternative:** it cannot prove the PostgreSQL isolation contract.
+
+```sh
+python -m venv .venv
+. .venv/bin/activate
+pip install --require-hashes -r requirements.txt
 ```
 
-Output:
-```
-============================================================
-  🚀 APEX FLOW - Smart Transport & Logistics System
-  Tagline: 'Smarter Logistics. Faster Tomorrow.'
-============================================================
-  Server Running on host 0.0.0.0 port 5050
-============================================================
-```
+1. Have the database operator create a dedicated database and non-owner `apex_app`
+   login as described in the runbook. Use generated credentials, never defaults.
+2. In an isolated migration job, supply `MIGRATION_DATABASE_URL`, then run:
+   ```sh
+   python -m backend.migrate
+   python -m backend.cli provision-tenant --name 'Your organization' \
+     --email 'operator@your-domain.invalid' --admin-name 'Tenant administrator'
+   ```
+   Provisioning prompts for a password without echoing it. It is not a web endpoint.
+3. Remove privileged credentials from the environment. Populate runtime values
+   listed in `.env.example` through your secret manager. Development must explicitly
+   use `APP_ENV=development`; production is the default. Secrets are required in
+   **every** environment. The app does not automatically load `.env` files.
+4. Start compute only; this does **not** seed or migrate anything:
+   ```sh
+   gunicorn 'backend.app:create_app()' --bind 0.0.0.0:5050 --workers 2 --timeout 30
+   ```
+   Dockerfile and Procfile use the same factory. Live probe: `/health/live`.
+   Database readiness probe: `/health/ready`.
 
-Open your browser and navigate to: `http://localhost:5050` or `http://127.0.0.1:5050`.
+**Existing installations:** the migration runner deliberately rejects an
+unversioned database. There is no safe way to infer tenant ownership from the old
+global dataset. Preserve the old DB, map ownership and identities, rotate all
+legacy passwords, and perform a reviewed offline import into a separate migrated
+DB. This change does not silently relabel legacy data or supply an import script
+that guesses tenancy.
 
-### 🔑 Local development credentials (never shipped in the login UI)
+## Browser/API contract changes
 
-These exist only when `FLASK_ENV` is not `production` **and** the corresponding `SEED_*_PASSWORD` env vars are unset. They are rejected at boot in production. Do not use them on a public URL.
+- Bootstrap CSRF with `GET /api/auth/csrf`; send `X-CSRF-Token` for **all** unsafe
+  requests including login/logout. Origin allowlisting is additional, not a substitute.
+- Authenticated requests use `X-Tenant-ID` as a selector. It must match a current
+  membership. A sole membership is the server default; multiple memberships
+  require an explicit selector. The current UI selects the first server-returned
+  membership; a tenant-switcher UI is not yet implemented.
+- Protected mutations require a 16–128 character `Idempotency-Key` containing
+  letters, digits, `_` or `-`. Reuse the same key and exact body after an ambiguous
+  response. Do not generate a new key to retry a failed network request.
+- Shipment lists support `limit` (1–200), `offset` (0–10000), allowlisted `sort` and
+  `direction`. Monetary/NUMERIC fields are serialized as decimal strings.
+- Authentication failures are 401; insufficient privileges are 403; inaccessible
+  private resource selectors normally return 404. Constraint failures are generic
+  409, not PostgreSQL exception text. Database unavailability returns 503.
 
-| Role | Email | Password (dev default) |
-| :--- | :--- | :--- |
-| **System Admin** | `admin@apexflow.com` | `Admin@123` |
-| **Logistics Manager** | `manager@apexflow.com` | `Manager@123` |
-| **Driver** | `driver@apexflow.com` | `Driver@123` |
-| **Customer** | `customer@apexflow.com` | `Customer@123` |
+## OTP delivery
 
----
+Shipment creation writes an encrypted OTP event in the same transaction as the
+shipment, delivery, invoice, notification and replay record. Configure an HTTPS
+consumer implementing the documented idempotent delivery contract, then schedule:
 
-## ⚙️ 3. Environment Variables Configuration
-
-APEX FLOW utilizes environment variables for production security and cloud deployment settings.
-
-Create a `.env` file in the root directory (refer to `.env.example`):
-
-```env
-# Server Binding
-PORT=5050
-HOST=0.0.0.0
-FLASK_ENV=production
-SECRET_KEY=your_super_secret_production_key_here
-
-# Database URL
-# SQLite Local (Default when empty):
-DATABASE_URL=
-# PostgreSQL Production (e.g. Render / Railway / Supabase / Neon / ElephantSQL):
-# DATABASE_URL=postgresql://username:password@ep-cloud-db.render.com:5432/apexflow_db
-```
-
----
-
-## 🗄️ 4. Database Configuration (SQLite vs PostgreSQL)
-
-APEX FLOW features an automatic dual-database engine in [backend/database.py](file:///Users/nandankumar/HImanshu/backend/database.py):
-
-- **Local SQLite**: Used automatically if `DATABASE_URL` is omitted. Stored in `data/apexflow.db`.
-- **Cloud PostgreSQL**: When deploying to production platforms (Render, Railway, Supabase, Neon, AWS RDS), set `DATABASE_URL` to your PostgreSQL URI. The application will automatically connect to PostgreSQL and create all required tables (`users`, `customers`, `vehicles`, `drivers`, `shipments`, `shipment_status_history`, `routes`, `warehouses`, `deliveries`, `payments`, `notifications`).
-
-Because the database resides on the cloud server, any record created on one device (e.g. creating shipment `SHP006` from an Android/iPhone) is immediately visible when opening APEX FLOW on any other device (PC, Laptop, Tablet).
-
----
-
-## 🌐 5. Production Deployment & Starting WSGI Server
-
-APEX FLOW includes a production-grade `Procfile` and `requirements.txt` ready for instant deployment to cloud platforms such as **Render**, **Railway**, **Fly.io**, **Koyeb**, **Heroku**, or a **VPS / Docker container**.
-
-### Option A: Deploying on Render (Free Public HTTPS URL)
-
-1. Push your repository to **GitHub / GitLab**.
-2. Log into [Render Dashboard](https://dashboard.render.com/) and click **New +** → **Web Service**.
-3. Connect your GitHub repository.
-4. Configure service settings:
-   - **Environment**: `Python 3`
-   - **Build Command**: `pip install -r requirements.txt`
-   - **Start Command**: `gunicorn backend.app:app`
-5. Add Environment Variables under **Environment**:
-   - `FLASK_ENV` = `production`
-   - `SECRET_KEY` = *(your generated secret)*
-   - `DATABASE_URL` = *(Optional: PostgreSQL URL provided by Render Postgres or Supabase)*
-6. Click **Create Web Service**.
-7. Render will build and launch your application, providing a public HTTPS URL (e.g., `https://apex-flow.onrender.com`).
-
-### Option B: Deploying on Railway
-
-1. Go to [Railway.app](https://railway.app) and create a **New Project**.
-2. Select **Deploy from GitHub repo**.
-3. Railway automatically detects `requirements.txt` and `Procfile`.
-4. Add environment variables (`PORT`, `SECRET_KEY`, `DATABASE_URL`).
-5. Generate a public domain under **Settings** → **Networking** (e.g., `https://apex-flow.up.railway.app`).
-
-### Option C: Manual Production Launch via Gunicorn (Linux / VPS)
-
-To start the Flask production server manually on a VPS (e.g., DigitalOcean, AWS EC2, Linode):
-
-```bash
-gunicorn --bind 0.0.0.0:5050 backend.app:app --workers 4
+```sh
+python -m backend.cli deliver-outbox --tenant AUTHORIZED_TENANT_ID \
+  --user WORKER_TENANT_ADMIN_USER_ID --limit 100
 ```
 
----
+Each job revalidates the worker's tenant membership. Running it twice is supported.
+Without a consumer, events stay pending: **no email or SMS has been sent**. Existing
+OTP expiration is 30 minutes from booking; a just-in-time issuance/reissuance workflow
+is still a release blocker for real multi-day deliveries.
 
-## 🔌 6. REST API Endpoints
+## Tests and dependency verification
 
-APEX FLOW exposes full RESTful JSON APIs:
+Use a **disposable** PostgreSQL database whose name ends in `_test`. The fixture
+resets that schema and creates/uses a restricted runtime role; it never uses SQLite.
+Do not point it at production. Tests generate credentials at runtime.
 
-| Method | Endpoint | Description | Sample Payload |
-| :--- | :--- | :--- | :--- |
-| `POST` | `/api/auth/login` | User login session | `{"email": "admin@apexflow.com", "password": "..."}` |
-| `POST` | `/api/auth/logout` | Clear session | N/A |
-| `GET` | `/api/shipments` | List all shipments | N/A |
-| `POST` | `/api/shipments` | Create new shipment | `{"customer": "ABC Ind", "pickup": "Ludhiana", "destination": "Delhi", "weight": 8000}` |
-| `GET` | `/api/vehicles` | Fleet vehicles list | N/A |
-| `POST` | `/api/vehicles` | Add new vehicle | `{"registration_number": "HR26BX4587", ...}` |
-| `GET` | `/api/drivers` | Drivers roster | N/A |
-| `POST` | `/api/drivers` | Add new driver | `{"name": "Rajesh Kumar", "license_number": "..."}` |
-| `GET` | `/api/customers` | Customer directory | N/A |
-| `GET` | `/api/routes` | Routes list | N/A |
-| `POST` | `/api/routes/optimize` | Calculate route ETA & fuel | `{"pickup": "Delhi", "destination": "Jaipur"}` |
-| `GET` | `/api/tracking` | Live GPS tracking data | N/A |
-| `GET` | `/api/reports/dashboard` | Dashboard KPIs summary | N/A |
-| `GET` | `/api/notifications` | User notifications | N/A |
-
-### Example API Request & Response (`POST /api/shipments`):
-
-**Request**:
-```json
-POST /api/shipments
-Content-Type: application/json
-
-{
-  "customer": "ABC Industries",
-  "pickup": "Ludhiana",
-  "destination": "Delhi",
-  "goods_type": "Electronics",
-  "weight": 8000
-}
+```sh
+pip install -r requirements-dev.txt
+# Inject TEST_DATABASE_ADMIN_URL for the disposable database via your environment.
+pytest -q
+pip-audit -r requirements.txt
 ```
 
-**Response**:
-```json
-{
-  "success": true,
-  "shipment_id": "SHP006",
-  "message": "Shipment created successfully",
-  "data": {
-    "shipment_id": "SHP006",
-    "customer_name": "ABC Industries",
-    "pickup_location": "Ludhiana",
-    "destination": "Delhi",
-    "status": "Booked",
-    "shipping_cost": 5000.0
-  }
-}
-```
+CI runs these contracts with PostgreSQL. Update `requirements.in`, regenerate the
+hash-pinned lockfile with pip-compile, audit, and rerun tests before dependency changes.
 
----
+## Release blockers / deliberate limitations
 
-## 📱 7. Responsive Breakpoints Verification Matrix
+Legacy ownership migration, operational secret provisioning, edge/origin lockdown,
+real consumer integration, OTP reissuance, alert routing, backups/restoration,
+load testing and complete dependency failover require operator/product work.
+Production tracking returns an explicit unavailable error rather than fabricated
+GPS coordinates. No upload/download, object-storage, bulk/import, real payment
+charge, password-reset email, system-admin HTTP API, or scheduler exists.
 
-APEX FLOW has been engineered and tested across standard mobile, tablet, laptop, and desktop resolutions:
-
-| Device Category | Breakpoint Width | Responsive Design Behavior |
-| :--- | :--- | :--- |
-| **Small Mobile** | `320px` | 1-col card grid, drawer navigation, scrollable tables, full-width forms |
-| **Standard Mobile** | `375px` | iPhone layout, touch-optimized tap targets, hamburger menu toggle |
-| **Large Mobile** | `414px` | Plus/Max mobile optimization, touch modals, 100% responsive header |
-| **Tablet Portrait** | `768px` | 2-col dashboard grid, slide-out drawer navigation overlay |
-| **Tablet Landscape**| `1024px` | Expanded stats layout, adaptive chart and map views |
-| **Standard Laptop** | `1366px` | Full fixed sidebar navigation, 4-col KPI metrics grid |
-| **Full HD Desktop** | `1920px` | Max-width content boundary, multi-column analytics grid |
-
----
-
-## 🔒 8. Security & Best Practices
-
-- **Authorization is enforced in the service layer**, not only with `@login_required`. Customers see their `customer_id` rows; drivers see assigned jobs; staff see the fleet.
-- **Delivery ≠ payment.** Marking a shipment delivered (OTP) does not flip invoices to Paid. Collect via `POST /api/payments/<invoice_id>/collect`.
-- **OTPs** are 6-digit CSPRNG values, hashed at rest, single-use, TTL 30 minutes, 5-attempt lockout. Seed OTPs from git (`4912`, …) are invalid.
-- **Login rate limit** is 5/minute, applied with `@limiter.limit` on the view Flask actually calls. Set `REDIS_URL` in production so workers share counters.
-- **Demo passwords are not on the login page.** Production boot refuses documented defaults (`Admin@123`, …).
-- **Passwords hashed** with `werkzeug.security`. **SQL** is parameterized. Session cookies are `HttpOnly`, `SameSite=Lax`, `Secure` in production.
-- **PostgreSQL fail-closed:** if `DATABASE_URL` is set and the connection fails, the app does not fall back to SQLite.
-- **Security headers:** `CSP`, `X-Frame-Options`, `nosniff`, `Referrer-Policy`, `HSTS` (production).
-- Run `pytest` before every release. Gates live in `tests/test_security.py`.
-
----
-
-## 📄 License & Credits
-
-Built for enterprise logistics and fleet operations.
-Designed & Developed for **APEX FLOW**. *"Smarter Logistics. Faster Tomorrow."*
+The initial transaction strategy serializes operations per tenant. This is a
+correctness-first baseline, **not** a high-throughput design. See the audit for
+remaining CSP, pagination, money/pricing and lifecycle limitations.

@@ -22,6 +22,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (res.success && res.data) {
           showToast(`Welcome back, ${res.data.name}!`, 'success');
+          // Select an authorized server-returned membership for this UI session.
+          // This is a selector only; the API revalidates membership on every request.
+          const membership = res.data.memberships?.[0];
+          if (membership) Object.assign(res.data, membership);
           localStorage.setItem('apexflow_user', JSON.stringify(res.data));
           setTimeout(() => {
             window.location.href = '/dashboard.html';
