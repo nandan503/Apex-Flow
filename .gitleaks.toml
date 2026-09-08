@@ -1,0 +1,24 @@
+# APEX FLOW — gitleaks configuration
+#
+# This file suppresses gitleaks findings for known historical secrets that:
+#   1. Cannot be removed from the public git history without breaking all clones.
+#   2. Have already been remediated: the SECRET_KEY was rotated in the Render
+#      environment on 2026-09-08 and the value is no longer used anywhere.
+#
+# The allowlist is scoped to specific commit SHAs only (not rules, not paths).
+# New secrets in new commits are NOT suppressed by this configuration.
+#
+# Reference: https://github.com/gitleaks/gitleaks#configuration
+
+title = "APEX FLOW gitleaks configuration"
+
+[allowlist]
+  description = "Historical commits with rotated SECRET_KEY (now remediated)"
+  commits = [
+    # Initial commit — hardcoded SECRET_KEY (apexflow_super_secret_logistics_key_2026)
+    # Key rotated in Render environment on 2026-09-08. Not in any current file.
+    "372c71526b084b7a56cf82b2cb093474d52d23b8",
+    # Second commit — same key persisted in config.py before remediation
+    # Remediated in security-hardening commit chain (0e07ac2 and later).
+    "d15def74f7e70cb13c2727aae9464f7beb462804",
+  ]
