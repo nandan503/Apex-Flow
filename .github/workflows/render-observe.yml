@@ -1,0 +1,250 @@
+# APEX FLOW — Render Deployment Observer
+#
+# ════════════════════════════════════════════════════════════════════════════
+# SECURITY MODEL
+# ════════════════════════════════════════════════════════════════════════════
+#
+# Trigger: push to main + workflow_dispatch ONLY.
+#   NEVER triggered by pull_request.
+#   RENDER_API_TOKEN is NEVER exposed to fork PRs or untrusted code.
+#
+# Permissions: explicit least-privilege per job.
+#   - observe job: contents:read only.
+#   - remediate job: contents:write + pull-requests:write, only when a
+#     safe automated fix is classified and human escalation is not required.
+#   - escalate job: no Render API access, no secrets.
+#
+# Secret handling: RENDER_API_TOKEN passed only to the observe step via
+#   env:, never echoed, never written to artifacts or step summaries.
+#   All log output passes through scripts/render_sanitize.py.
+#
+# Bounded autonomy:
+#   - REMEDIATION_ATTEMPT is hard-coded to "1" in the remediate job.
+#     The workflow will never run a second automated fix for the same failure.
+#   - Automated fixes go to a 'fix/render-diag-<sha>' branch as a PR.
+#     Human review is required before merge.
+#   - No automated merges. No force-pushes to main.
+#
+# ════════════════════════════════════════════════════════════════════════════
+
+name: Render - Observe and Diagnose
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      commit_sha:
+        description: >-
+          Commit SHA to observe (leave blank to use HEAD).
+        required: false
+        default: ''
+
+# One observation run per commit; do not cancel in-flight.
+concurrency:
+  group: render-observe-${{ github.sha }}
+  cancel-in-progress: false
+
+# ---------------------------------------------------------------------------
+# Job 1: Observe the Render deployment (read-only)
+# ---------------------------------------------------------------------------
+jobs:
+  observe:
+    name: Observe Render deployment
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    permissions:
+      contents: read
+
+    outputs:
+      deploy_status:   ${{ steps.observe.outputs.deploy_status }}
+      failure_classes: ${{ steps.observe.outputs.failure_classes }}
+      needs_human:     ${{ steps.observe.outputs.needs_human }}
+      has_safe_fix:    ${{ steps.observe.outputs.has_safe_fix }}
+      deploy_id:       ${{ steps.observe.outputs.deploy_id }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      # RENDER_API_TOKEN is scoped to this step only.
+      # It is never echoed, never written to $GITHUB_OUTPUT directly,
+      # and never placed in any artifact or step summary.
+      - name: Observe Render deployment and collect diagnostics
+        id: observe
+        env:
+          RENDER_API_TOKEN: ${{ secrets.RENDER_API_TOKEN }}
+          GITHUB_SHA: ${{ github.sha }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: |
+          OBSERVE_SHA="${{ inputs.commit_sha }}"
+          if [ -z "$OBSERVE_SHA" ]; then
+            OBSERVE_SHA="${GITHUB_SHA}"
+          fi
+          python scripts/render_observe.py \
+            --output diagnostics \
+            --commit "$OBSERVE_SHA"
+
+      - name: Upload sanitized diagnostic bundle
+        if: always() && steps.observe.outputs.deploy_status != 'live'
+        uses: actions/upload-artifact@v4
+        with:
+          name: render-diagnostics-${{ github.run_id }}-${{ github.run_attempt }}
+          path: diagnostics/
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Print deployment status
+        if: always()
+        run: |
+          STATUS="${{ steps.observe.outputs.deploy_status }}"
+          if [ "$STATUS" = "live" ]; then
+            echo "Render deployment is LIVE."
+          elif [ "$STATUS" = "failed" ]; then
+            echo "Render deployment FAILED."
+            echo "  Failure classes: ${{ steps.observe.outputs.failure_classes }}"
+            echo "  Needs human:     ${{ steps.observe.outputs.needs_human }}"
+            echo "  Has safe fix:    ${{ steps.observe.outputs.has_safe_fix }}"
+          elif [ "$STATUS" = "timeout" ]; then
+            echo "Render deployment observation TIMED OUT."
+          else
+            echo "Render deployment status: ${STATUS:-unknown}"
+          fi
+
+  # ---------------------------------------------------------------------------
+  # Job 2: Bounded automated remediation (only when safe and classified)
+  # ---------------------------------------------------------------------------
+  remediate:
+    name: Attempt bounded automated fix
+    needs: observe
+    if: |
+      needs.observe.outputs.deploy_status == 'failed' &&
+      needs.observe.outputs.has_safe_fix == 'true' &&
+      needs.observe.outputs.needs_human == 'false'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install application dependencies
+        run: pip install -r requirements.txt
+
+      - name: Parse first failure class
+        id: parse
+        run: |
+          CLASSES="${{ needs.observe.outputs.failure_classes }}"
+          FIRST=$(echo "$CLASSES" | cut -d';' -f1)
+          CAT=$(echo "$FIRST" | cut -d'/' -f1)
+          SUB=$(echo "$FIRST" | cut -d'/' -f2)
+          echo "category=$CAT"    >> "$GITHUB_OUTPUT"
+          echo "subcategory=$SUB" >> "$GITHUB_OUTPUT"
+          echo "Fix target: $CAT/$SUB"
+
+      - name: Run bounded remediation (attempt 1 of 1 maximum)
+        id: fix
+        env:
+          REMEDIATION_ATTEMPT: "1"
+        run: |
+          python scripts/render_fix.py \
+            --category    "${{ steps.parse.outputs.category }}" \
+            --subcategory "${{ steps.parse.outputs.subcategory }}"
+
+      - name: Check for uncommitted changes
+        id: diff
+        run: |
+          if git diff --quiet HEAD; then
+            echo "has_changes=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_changes=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Commit and open PR with fix
+        if: steps.diff.outputs.has_changes == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          SHORT_SHA="${GITHUB_SHA:0:12}"
+          BRANCH="fix/render-diag-${SHORT_SHA}"
+          CATEGORY="${{ steps.parse.outputs.category }}"
+          SUBCATEGORY="${{ steps.parse.outputs.subcategory }}"
+          DEPLOY_ID="${{ needs.observe.outputs.deploy_id }}"
+
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$BRANCH"
+          git add -A
+          git commit -m "fix(render): automated remediation for ${CATEGORY}/${SUBCATEGORY}
+
+          Deploy ${DEPLOY_ID} failed. Classified failure: ${CATEGORY}/${SUBCATEGORY}.
+          This is attempt 1 of 1. If this fix does not resolve the issue, a second
+          automated attempt will NOT be made; human review is required.
+
+          Triggered by commit: ${GITHUB_SHA}"
+
+          git push origin "$BRANCH"
+
+          PR_BODY="Automated Render Failure Remediation.
+          Failure: ${CATEGORY}/${SUBCATEGORY}. Deploy: ${DEPLOY_ID}.
+          Review this PR before merging. If it does not fix the issue,
+          close it and investigate manually in the Render dashboard.
+          Second automated attempt will NOT be made after merge."
+
+          gh pr create \
+            --title "fix(render): automated ${CATEGORY}/${SUBCATEGORY} remediation" \
+            --body  "$PR_BODY" \
+            --head  "$BRANCH" \
+            --base  main
+
+      - name: Report no changes (false positive classification)
+        if: steps.diff.outputs.has_changes == 'false'
+        run: |
+          echo "::warning::Remediation ran but made no changes."
+          echo "  The failure classification may be a false positive."
+          echo "  Manual Render log review is recommended."
+          echo "  Deploy ID: ${{ needs.observe.outputs.deploy_id }}"
+
+  # ---------------------------------------------------------------------------
+  # Job 3: Human escalation notice (no secrets, no Render API access)
+  # ---------------------------------------------------------------------------
+  escalate:
+    name: Human escalation required
+    needs: observe
+    if: |
+      needs.observe.outputs.deploy_status != 'live' &&
+      needs.observe.outputs.needs_human == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Write escalation notice to step summary
+        env:
+          COMMIT_SHA:      ${{ github.sha }}
+          DEPLOY_STATUS:   ${{ needs.observe.outputs.deploy_status }}
+          FAILURE_CLASSES: ${{ needs.observe.outputs.failure_classes }}
+          DEPLOY_ID:       ${{ needs.observe.outputs.deploy_id }}
+        run: python scripts/render_escalate.py
