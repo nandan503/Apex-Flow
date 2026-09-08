@@ -535,11 +535,25 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--repo", default=os.environ.get("GITHUB_REPOSITORY", DEFAULT_REPO))
     parser.add_argument("--commit", default=os.environ.get("GITHUB_SHA", ""))
     parser.add_argument("--service-url", default=DEFAULT_SERVICE_URL)
+    parser.add_argument(
+        "--service-id", default=os.environ.get("RENDER_SERVICE_ID", ""),
+        help="Render service ID. If set, skips auto-discovery. "
+             "Can also be supplied via RENDER_SERVICE_ID env var.",
+    )
     args = parser.parse_args(argv)
 
-    token = os.environ.get("RENDER_API_TOKEN", "")
+    # Accept RENDER_API_KEY (preferred) or RENDER_API_TOKEN (legacy alias).
+    token = (
+        os.environ.get("RENDER_API_KEY", "")
+        or os.environ.get("RENDER_API_TOKEN", "")
+    )
     if not token:
-        print("ERROR: RENDER_API_TOKEN environment variable is not set.", file=sys.stderr)
+        print(
+            "ERROR: RENDER_API_KEY environment variable is not set.\n"
+            "  Add RENDER_API_KEY to GitHub Actions repository secrets.\n"
+            "  (RENDER_API_TOKEN is accepted as a legacy alias.)",
+            file=sys.stderr,
+        )
         return 1
 
     guard = sanitize_token(token)
@@ -555,27 +569,48 @@ def main(argv: list[str] | None = None) -> int:
         return 2
 
     # Phase 2: Identify service
-    _log(f"Identifying Render service for repo {args.repo} …")
-    try:
-        services = client.list_services()
-    except RenderApiError as exc:
-        _log(f"ERROR listing services: {sanitize_text(str(exc))}")
-        return 2
+    # Fast path: service ID provided directly via --service-id or RENDER_SERVICE_ID.
+    if args.service_id:
+        service_id   = args.service_id.strip()
+        _log(f"Service ID provided directly: {service_id} (skipping auto-discovery)")
+        status_code, svc_data = client._get(
+            f"/services/{urllib.parse.quote(service_id, safe='')}"
+        )
+        if status_code == 200 and isinstance(svc_data, dict):
+            svc = svc_data.get("service", svc_data)
+            service_name = svc.get("name", service_id)
+            owner_id     = svc.get("ownerId", "")
+        else:
+            service_name = service_id
+            owner_id     = ""
+            _log(f"  Warning: could not fetch service metadata (HTTP {status_code}).")
+    else:
+        # Slow path: paginated discovery via repo URL matching.
+        _log(f"Identifying Render service for repo {args.repo} (auto-discovery) …")
+        _log("  Tip: set RENDER_SERVICE_ID as a repository variable to skip this step.")
+        try:
+            services = client.list_services()
+        except RenderApiError as exc:
+            _log(f"ERROR listing services: {sanitize_text(str(exc))}")
+            return 2
 
-    try:
-        service = find_service(services, args.repo)
-    except RenderApiError as exc:
-        _log(str(exc))
-        return 5
+        try:
+            service = find_service(services, args.repo)
+        except RenderApiError as exc:
+            _log(str(exc))
+            return 5
 
-    if service is None:
-        _log(f"ERROR: No Render service found for repo {args.repo}.")
-        _log("       Ensure the service is connected to the correct GitHub repository.")
-        return 4
+        if service is None:
+            _log(f"ERROR: No Render service found for repo {args.repo}.")
+            _log("  Options:")
+            _log("  1. Set RENDER_SERVICE_ID as a GitHub Actions repository variable.")
+            _log("  2. Ensure the Render service has the GitHub repo URL configured.")
+            return 4
 
-    service_id   = service.get("id", "")
-    service_name = service.get("name", service_id)
-    owner_id     = service.get("ownerId", "")
+        service_id   = service.get("id", "")
+        service_name = service.get("name", service_id)
+        owner_id     = service.get("ownerId", "")
+
     _log(f"Service: {service_name} ({service_id})")
 
     # Phase 3: Observe the deployment
