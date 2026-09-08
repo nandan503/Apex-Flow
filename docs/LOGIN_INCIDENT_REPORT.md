@@ -111,49 +111,82 @@ inside the stale live build's origin gate plus deployment configuration
 
 ## 6. Root cause (summary)
 
-1. **Application cause:** the live service runs a pre-fix build whose origin
-   gate classifies the *same-origin* production login POST as cross-origin and
-   answers 403 `Cross-origin request blocked`. The fix for that defect
-   (same-origin recognition in `backend/app.py`, plus `/api/auth/csrf` and
-   health endpoints) is already merged into `main` (`0b5771b` → `d0cd934`).
-2. **Deployment cause:** that fix is **not live**. Render still serves the
-   PR #1-era build (verified by byte-identical frontend assets and the missing
-   `/api/auth/csrf`, `/health/live`, `/health/ready` routes). Earlier deploys
-   of PR #2/#3 did not take effect (startup/entrypoint and CI failures; the
-   Dockerfile/Procfile factory invocation `backend.app:create_app()` was only
-   corrected in PR #3 and is present at HEAD).
-3. **Configuration cause:** for the corrected code (and for the pre-fix code's
-   `request.host_url` shortcut) to recognize the apex origin, the service
-   environment must set `TRUST_PROXY=1` (edge overwrites forwarded headers)
-   and/or `ALLOWED_ORIGINS=https://apex.viability.in`. Without those, HEAD
-   fails closed — exactly as designed — and login stays blocked.
+1. **Deployment cause (now proven from Render logs/API):** Render's service
+   `Apex-Flow` (`srv-daeu5eht0dsc73bp78jg`) is a **native Python service** with
+   `autoDeploy=yes` (trigger `commit`, branch `main`) whose dashboard
+   **start command is still `gunicorn backend.app:app --bind 0.0.0.0:$PORT`**.
+   Since the security refactor, `backend/app.py` exposes only the
+   `create_app()` factory — there is no module-level `app`. Every automatic
+   deploy since PR #1 therefore builds successfully and then dies at boot:
+   `gunicorn.errors.AppImportError: Failed to find attribute 'app' in
+   'backend.app'` → `update_failed`. Render keeps serving the last **live**
+   deploy, which was the **manual** PR #1 deploy (2026-09-07 20:46 UTC) — the
+   pre-fix build whose origin gate 403s same-origin login.
+2. **Application cause:** that live build predates the same-origin login fix
+   (merged `0b5771b`, present in `main` HEAD), so its origin gate classifies
+   the same-origin production login POST as cross-origin → 403
+   `Cross-origin request blocked`.
+3. **Configuration cause:** the corrected code (and the pre-fix code's
+   `request.host_url` shortcut) need `TRUST_PROXY=1` (edge rewrites forwarded
+   headers) and/or `ALLOWED_ORIGINS=https://apex.viability.in`. Without them
+   HEAD fails closed — by design.
+
+Deploy forensics (Render API, 2026-09-08 14:44 UTC):
+
+| Deploy | Trigger | Status |
+|---|---|---|
+| PR #1 `8f57bb4` | manual | **live** (2026-09-07 20:46) — what is serving today |
+| PR #2 `0e7eea1` | new_commit | `update_failed` |
+| PR #3 `d0cd934` | new_commit | `update_failed` |
+| PR #4 `ae38af8` | new_commit | `update_failed` |
+| PR #5 `72e8175` | new_commit | `update_failed` |
+
+Render log excerpt (deploy of `72e8175`, 2026-09-08 14:43 UTC):
+
+```
+==> Running 'gunicorn backend.app:app --bind 0.0.0.0:$PORT'
+AttributeError: module 'backend.app' has no attribute 'app'
+gunicorn.errors.AppImportError: Failed to find attribute 'app' in 'backend.app'.
+==> Exited with status 1
+```
+
 
 ## 7. Fix
 
 No new wildcard CORS, no CSRF/cookie weakening, no new providers, no redesign.
-The minimal correct fix is already in repository HEAD and is **small + narrow**:
+The code is already correct in `main`; the blocker is deployment
+configuration. Required actions:
 
-- `backend/app.py` — same-origin requests are recognized by scheme/host/port
-  (`_origin_matches_request`) and never require the cross-origin allowlist;
-  hostile/malformed origins still fail closed with 403.
-- `frontend/js/*` — relative `/api/...` URLs only; `credentials: 'same-origin'`;
-  CSRF token header on mutations; CSP `connect-src 'self'`.
-- `backend/config.py` + `.env.example`/`docs/OPERATIONS.md` — exact-origin
-  allowlist (no `*`), `TRUST_PROXY` contract, production HTTPS/Secure cookies.
+1. **Render dashboard / API (service `Apex-Flow`): change the Start Command to**
+   ```
+   gunicorn 'backend.app:create_app()' --bind 0.0.0.0:${PORT:-5050}
+   ```
+   (This is the same command as the repository `Procfile`/`Dockerfile`; the
+   Render service is a native Python service and ignores the repository
+   `Dockerfile` for its start command.) Auto-deploy will then boot current
+   `main`. If the boot then reports a missing configuration value, the app
+   fails fast with the *name* of the missing key in the Render logs (values are
+   never printed); collect logs with the Render diagnostics workflow (below)
+   and set the corresponding variable.
+2. **Environment on the service:** confirm the required variables exist with
+   the current names: `SECRET_KEY` (≥32 chars), `DATABASE_URL`
+   (PostgreSQL, `sslmode=verify-full`, dedicated `apex_app` role,
+   migrations `001`+`002` applied — see `docs/OPERATIONS.md`),
+   `OUTBOX_ENCRYPTION_KEY`, `IDEMPOTENCY_HASH_KEYS`,
+   `ALLOWED_ORIGINS=https://apex.viability.in`, and `TRUST_PROXY=1`.
+3. Re-deploy (or wait for auto-deploy) and verify with a real browser login on
+   https://apex.viability.in plus `GET /health/live` and `GET /health/ready`.
+4. Re-run diagnostics after the change from GitHub → Actions → **Render
+   diagnostics** (now on `main`, `workflow_dispatch`, requires the
+   `Production` environment secret `RENDER_API_TOKEN`); it reports deployment
+   state, deployed commit, logs and canonical health.
 
-**To make login work in production (operator action, outside this repository):**
-deploy `main` HEAD and set on the Render service:
-
-```
-TRUST_PROXY=1
-ALLOWED_ORIGINS=https://apex.viability.in
-```
-
-plus the existing required secrets (`SECRET_KEY`, `DATABASE_URL` with
-`sslmode=verify-full`, `OUTBOX_ENCRYPTION_KEY`, `IDEMPOTENCY_HASH_KEYS`), then
-verify with `GET /health/live`, `GET /health/ready`, and a real browser login.
-If the free-instance sleep interstitial is disruptive, keep the instance warm
-or move off the auto-sleeping free tier.
+Application-side hardening already in `main` and covered by tests:
+same-origin requests are recognized by scheme/host/port and never require the
+cross-origin allowlist; hostile/malformed origins fail closed; flask-cors is
+narrow (no `*`, credentials only for allowlisted origins); cookies stay
+`HttpOnly`/`Secure`/`SameSite=Lax` host-only; frontend uses relative `/api`
+URLs and CSP `connect-src 'self'`.
 
 ## 8. Tests added by this investigation
 
@@ -183,10 +216,15 @@ or move off the auto-sleeping free tier.
 
 - Live today: **fails** — 403 `Cross-origin request blocked` reproduced on both
   `https://apex.viability.in/api/auth/login` and
-  `https://apex-flow-7mr9.onrender.com/api/auth/login` because the stale build
-  is still deployed and/or `TRUST_PROXY`/`ALLOWED_ORIGINS` are not set.
-- Repository HEAD: full PostgreSQL suite is green on `main` CI (run
-  `34230831509` after PR #3) and the new contract tests pass locally.
-- **Do not merge/deploy further until HEAD is deployed with `TRUST_PROXY=1` and
-  `ALLOWED_ORIGINS=https://apex.viability.in` and a browser login on
-  https://apex.viability.in succeeds.**
+  `https://apex-flow-7mr9.onrender.com/api/auth/login` because the last live
+  Render deploy (PR #1 era, manual, 2026-09-07) is still serving. Every
+  automatic deploy since (PRs #2–#5, including the same-origin login fix and
+  health endpoints) failed at boot with `AppImportError: Failed to find
+  attribute 'app' in 'backend.app'` because the Render service start command is
+  still `gunicorn backend.app:app`.
+- Repository `main`: full PostgreSQL suite green (CI runs for PRs #3–#6) and
+  the new contract tests pass locally and in CI.
+- **Login cannot go live until the Render service start command is changed to
+  `gunicorn 'backend.app:create_app()' ...` (with `TRUST_PROXY=1` and
+  `ALLOWED_ORIGINS=https://apex.viability.in` configured) and a browser login
+  on https://apex.viability.in succeeds.**

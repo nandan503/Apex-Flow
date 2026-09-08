@@ -104,6 +104,18 @@ var. Fixed in `backend/app.py::_origin_matches_request` with regression tests in
 → Cloudflare edge). Render "Application loading" interstitial observed via remote fetch during
 diagnosis — instance state, not an application defect.
 
+Deployment forensics 2026-09-08 (Render API + logs, see `docs/LOGIN_INCIDENT_REPORT.md`):
+auto-deploy is enabled on the Render service (native Python runtime, branch `main`), but its
+dashboard **start command is still `gunicorn backend.app:app`**. Current `main` exposes only
+the `create_app()` factory (no module-level `app`), so every auto-deploy since PR #1 builds
+and then dies with `AppImportError: Failed to find attribute 'app' in 'backend.app'`
+(`update_failed`); the last live deploy is the manual PR #1 deploy. Change the service Start
+Command to `gunicorn 'backend.app:create_app()' --bind 0.0.0.0:${PORT:-5050}` and confirm the
+required environment keys (SECRET_KEY, DATABASE_URL sslmode=verify-full, OUTBOX_ENCRYPTION_KEY,
+IDEMPOTENCY_HASH_KEYS, ALLOWED_ORIGINS=https://apex.viability.in, TRUST_PROXY=1), then re-run
+the **Render diagnostics** workflow (`.github/workflows/render-diagnostics.yml`,
+`workflow_dispatch` on `main`) to verify deployment state and canonical health.
+
 Cloudflare routing is **compute redundancy only**. All providers currently depend on
 the same PostgreSQL authority and consumer. If that authority fails, switching compute
 does not fix the outage. No database/storage redundancy has been provisioned or tested.
