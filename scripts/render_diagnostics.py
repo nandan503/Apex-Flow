@@ -287,12 +287,19 @@ class RenderClient:
 
     def get_logs(self, owner_id, resource_id, start_epoch, end_epoch,
                  limit=MAX_LOG_LINES):
-        """GET /v1/logs -- requires ownerId and resource; epoch time range."""
+        """GET /v1/logs -- requires ownerId and resource; RFC3339 time range.
+
+        The Render API parses startTime/endTime as RFC3339 timestamps, not
+        epoch seconds (epochs produce HTTP 400 schema errors).
+        """
+        def rfc3339(epoch):
+            return datetime.fromtimestamp(epoch, timezone.utc).strftime(
+                '%Y-%m-%dT%H:%M:%SZ')
         params = {
             'ownerId': owner_id,
             'resource': resource_id,
-            'startTime': str(int(start_epoch)),
-            'endTime': str(int(end_epoch)),
+            'startTime': rfc3339(start_epoch),
+            'endTime': rfc3339(end_epoch),
             'direction': 'backward',
             'limit': limit,
         }
