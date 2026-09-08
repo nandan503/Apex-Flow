@@ -1,8 +1,7 @@
 from flask import Blueprint, request, session, g
 
-from backend.auth import authenticate_user, get_user_by_id, login_required, require_role
+from backend.auth import authenticate_user, get_user_by_id, login_required, require_role, logout_session
 from backend.utils import json_response, error_response
-from backend.limiter import limiter
 from backend.errors import AuthzError, ValidationError, AppError
 from backend.services import (
     get_all_shipments, get_shipment_by_id, create_shipment, update_shipment_status,
@@ -29,15 +28,14 @@ def _caller():
 # ── AUTHENTICATION ─────────────────────────────────────────────────────────────
 
 @api_bp.route('/auth/login', methods=['POST'])
-@limiter.limit("5 per minute")
 def login():
     data = request.get_json(silent=True) or {}
     email = bound_text(data.get('email'), 'email', max_len=120, required=True)
     password = data.get('password')
-    if not isinstance(password, str) or not password:
+    if not isinstance(password, str) or not password or len(password) > 1024:
         return error_response('Email and password are required', 400)
     # Do not strip interior password characters; only reject empty.
-    password = password.strip('\n\r')
+    # Password bytes are not normalized or stripped.
     if not password:
         return error_response('Email and password are required', 400)
 
@@ -45,16 +43,12 @@ def login():
     if err:
         return error_response(err, 401)
 
-    session.clear()
-    session['user_id'] = user['user_id']
-    session['role'] = user['role']
-    session.permanent = True
     return json_response(data=user, message='Login successful')
 
 
 @api_bp.route('/auth/logout', methods=['POST'])
 def logout():
-    session.clear()
+    logout_session()
     return json_response(message='Logged out successfully')
 
 
@@ -75,8 +69,14 @@ def get_current_user():
 def list_shipments():
     status = request.args.get('status')
     search = request.args.get('search')
+    try:
+        limit = int(request.args.get('limit', 100))
+        offset = int(request.args.get('offset', 0))
+    except ValueError:
+        raise ValidationError('Invalid pagination')
     shipments = get_all_shipments(
-        status_filter=status, search=search, caller=_caller()
+        status_filter=status, search=search, caller=_caller(), limit=limit, offset=offset,
+        sort=request.args.get('sort', 'created_at'), direction=request.args.get('direction', 'desc'),
     )
     return json_response(data=shipments)
 
@@ -105,7 +105,7 @@ def add_shipment():
 @require_role('ADMIN', 'MANAGER', 'DRIVER')
 def update_status(shipment_id):
     data = request.get_json(silent=True) or {}
-    new_status = data.get('status')
+    new_status = bound_text(data.get('status'), 'status', max_len=40, required=True)
     if not new_status:
         return error_response('Status is required', 400)
     shipment = update_shipment_status(
@@ -264,7 +264,6 @@ def list_deliveries():
 
 
 @api_bp.route('/deliveries/confirm', methods=['POST'])
-@limiter.limit("5 per minute")
 @require_role('DRIVER')
 def confirm_delivery_api():
     data = request.get_json(silent=True) or {}

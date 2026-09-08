@@ -62,6 +62,12 @@ function exportReportJSON() {
   downloadAnchor.remove();
 }
 
+function csvCell(value) {
+  let text = String(value ?? '');
+  if (/^[\s]*[=+@-]/.test(text) || /^[\t\r\n]/.test(text)) text = "'" + text;
+  return `"${text.replace(/"/g, '""')}"`;
+}
+
 function exportReportCSV() {
   if (currentReportData.length === 0) {
     showToast('No report data to export', 'warning');
@@ -70,7 +76,7 @@ function exportReportCSV() {
   const keys = Object.keys(currentReportData[0]);
   let csv = keys.join(',') + '\n';
   currentReportData.forEach(row => {
-    csv += keys.map(k => `"${String(row[k] ?? '').replace(/"/g, '""')}"`).join(',') + '\n';
+    csv += keys.map(k => csvCell(row[k])).join(',') + '\n';
   });
 
   const blob = new Blob([csv], { type: 'text/csv' });

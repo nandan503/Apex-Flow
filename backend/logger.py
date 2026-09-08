@@ -8,7 +8,9 @@ PII fields (email, phone, receiver_name) are partially redacted in logs.
 import logging
 import json
 import re
-from datetime import datetime
+from datetime import datetime, timezone
+
+from flask import has_request_context, g
 
 # Configure root app logger
 logging.basicConfig(
@@ -39,8 +41,14 @@ def _redact_phone(phone: str) -> str:
 
 def _log_event(logger, level: str, event: str, **fields):
     """Emit a structured JSON log line for a security event."""
+    allowed = {'user_id', 'role', 'email', 'ip', 'reason', 'endpoint', 'resource',
+               'resource_id', 'shipment_id', 'attempt', 'receiver', 'context', 'error_type'}
+    fields = {key: value for key, value in fields.items() if key in allowed}
+    if has_request_context():
+        fields['request_id'] = getattr(g, 'request_id', None)
+        fields['tenant_id'] = getattr(getattr(g, 'caller', None), 'tenant_id', None)
     record = {
-        'timestamp': datetime.utcnow().isoformat() + 'Z',
+        'timestamp': datetime.now(timezone.utc).isoformat(),
         'event': event,
         **fields
     }
@@ -101,6 +109,6 @@ def log_rate_limit_hit(endpoint: str, ip: str):
                endpoint=endpoint, ip=ip)
 
 
-def log_app_error(context: str, error: str):
+def log_app_error(context: str, error: Exception):
     _log_event(app_logger, 'error', 'APP_ERROR',
-               context=context, error=str(error)[:200])
+               context=context, error_type=type(error).__name__)

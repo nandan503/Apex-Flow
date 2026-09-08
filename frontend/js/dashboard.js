@@ -17,7 +17,7 @@ async function loadDashboardData() {
       setText('kpiDelayed', data.delayed || 0);
       setText('kpiAvailVehicles', `${data.available_vehicles}/${data.total_vehicles}`);
       setText('kpiActiveDrivers', `${data.active_drivers}/${data.total_drivers}`);
-      setText('kpiRevenue', `₹${(data.total_revenue || 0).toLocaleString()}`);
+      setText('kpiRevenue', `₹${Number(data.total_revenue || 0).toLocaleString()}`);
       setText('kpiFuelCost', `₹${(data.estimated_fuel_cost || 0).toLocaleString()}`);
 
       renderRecentShipments(data.recent_shipments || []);

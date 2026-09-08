@@ -36,6 +36,7 @@ DRIVER_ALLOWED_STATUSES = frozenset({
 @dataclass(frozen=True)
 class Caller:
     user_id: str
+    tenant_id: str
     role: str
     name: str
     email: str

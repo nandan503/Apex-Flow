@@ -42,28 +42,52 @@ function currentUser() {
   }
 }
 
+let csrfPromise;
+async function csrfToken() {
+  if (!csrfPromise) {
+    csrfPromise = fetch(`${API_BASE}/auth/csrf`, { credentials: 'same-origin' })
+      .then(async r => {
+        if (!r.ok) throw new Error('Unable to establish secure session');
+        return (await r.json()).data.csrf_token;
+      }).catch(e => { csrfPromise = null; throw e; });
+  }
+  return csrfPromise;
+}
+
 async function fetchAPI(endpoint, options = {}) {
   const { headers: extraHeaders, ...rest } = options;
+  const method = (rest.method || 'GET').toUpperCase();
+  const mutation = !['GET', 'HEAD', 'OPTIONS'].includes(method);
+  const tenant = currentUser()?.tenant_id || '';
   const config = {
     credentials: 'same-origin',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(extraHeaders || {})
-    },
+    headers: { 'Content-Type': 'application/json', ...(tenant ? { 'X-Tenant-ID': tenant } : {}), ...(extraHeaders || {}) },
     ...rest
   };
-
+  let pendingSlot;
   try {
-    const response = await fetch(`${API_BASE}${endpoint}`, config);
-    const result = await response.json().catch(() => ({}));
-
-    if (!response.ok) {
-      throw new Error(result.message || 'API error occurred');
+    if (mutation) {
+      config.headers['X-CSRF-Token'] = await csrfToken();
+      if (!endpoint.startsWith('/auth/')) {
+        // Persist only a digest and opaque key, never form data, OTPs or credentials.
+        // Ambiguous responses keep this key across reloads/provider retries.
+        const bytes = new TextEncoder().encode(`${currentUser()?.user_id}|${tenant}|${method}|${endpoint}|${rest.body || ''}`);
+        const hash = await crypto.subtle.digest('SHA-256', bytes);
+        pendingSlot = 'apex-pending-' + Array.from(new Uint8Array(hash), x => x.toString(16).padStart(2, '0')).join('');
+        const key = config.headers['Idempotency-Key'] || sessionStorage.getItem(pendingSlot) || crypto.randomUUID();
+        sessionStorage.setItem(pendingSlot, key);
+        config.headers['Idempotency-Key'] = key;
+      }
     }
+    const response = await fetch(`${API_BASE}${endpoint}`, config);
+    const result = await response.json();
+    if (pendingSlot && response.status < 500 && response.status !== 429) sessionStorage.removeItem(pendingSlot);
+    if (endpoint === '/auth/login' || endpoint === '/auth/logout' || result.error === 'CSRF') csrfPromise = null;
+    if (!response.ok) throw new Error(result.message || 'API error occurred');
     return result;
   } catch (error) {
-    console.error(`API Error [${endpoint}]:`, error);
-    showToast(error.message || 'Server communication failed', 'danger');
+    // Do not print payloads, credentials or potentially private resource URLs.
+    showToast(error.message || 'Server communication failed; retry the same operation', 'danger');
     throw error;
   }
 }
