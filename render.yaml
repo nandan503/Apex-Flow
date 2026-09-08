@@ -1,0 +1,39 @@
+# Render Blueprint. The web service is a WSGI application FACTORY: backend/app.py
+# exposes create_app() and deliberately has no module-level Flask object, so
+# `gunicorn backend.app:app` cannot work. Gunicorn's factory syntax is required.
+#
+# Existing services created from the dashboard do NOT read this file: their
+# Start Command must be corrected to the startCommand below by hand.
+#
+# This file provisions no database, runs no migration and seeds no credential.
+# Migrations stay in an isolated job holding MIGRATION_DATABASE_URL, which must
+# never be present in this service's environment (see docs/OPERATIONS.md).
+services:
+  - type: web
+    name: apex-flow
+    runtime: python
+    plan: starter
+    healthCheckPath: /health/live
+    buildCommand: pip install --require-hashes -r requirements.txt
+    startCommand: gunicorn 'backend.app:create_app()' --bind 0.0.0.0:$PORT --workers ${WEB_CONCURRENCY:-2} --timeout 30 --access-logfile - --access-logformat '%(m)s %(s)s %(L)s'
+    envVars:
+      - key: PYTHON_VERSION
+        value: '3.11'
+      - key: APP_ENV
+        value: production
+      - key: WEB_CONCURRENCY
+        value: '2'
+      # Required by the canonical topology (apex.viability.in -> Cloudflare -> Render).
+      - key: TRUST_PROXY
+        value: '1'
+      # Secrets and origins are supplied in the dashboard/secret manager, never here.
+      - key: SECRET_KEY
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+      - key: OUTBOX_ENCRYPTION_KEY
+        sync: false
+      - key: IDEMPOTENCY_HASH_KEYS
+        sync: false
+      - key: ALLOWED_ORIGINS
+        sync: false
