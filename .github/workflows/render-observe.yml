@@ -311,7 +311,7 @@ jobs:
           DEPLOY_ID:   ${{ needs.observe.outputs.deploy_id }}
           ATTEMPT:     ${{ needs.observe.outputs.attempt_count }}
           MAX_ATTEMPTS: ${{ vars.MAX_REPAIR_ATTEMPTS || '2' }}
-          BRANCH:      agent/render-fix-${{ github.sha && github.sha || '' }}
+          BRANCH:      agent/render-fix-${{ github.sha }}
           RUN_URL:     ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
       # ── Optional: re-observe after deploy (AUTO_DEPLOY_RENDER=true) ──────
