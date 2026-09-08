@@ -181,6 +181,32 @@ configuration. Required actions:
    `Production` environment secret `RENDER_API_TOKEN`); it reports deployment
    state, deployed commit, logs and canonical health.
 
+### Fix progress (2026-09-08, applied via Render API from CI)
+
+The following was applied and confirmed against the live service:
+
+- **Start command** (`serviceDetails.envSpecificDetails.startCommand`) changed
+  from `gunicorn backend.app:app --bind 0.0.0.0:$PORT` to
+  `gunicorn 'backend.app:create_app()' --bind 0.0.0.0:${PORT:-5050}` (partial
+  PATCH; confirmed in the API response; old value recorded for rollback).
+- **Non-secret environment variables** added individually (add/update
+  single-key endpoint, no other variable read or modified):
+  `TRUST_PROXY=1` and `ALLOWED_ORIGINS=https://apex.viability.in`.
+- A deploy was then triggered; the app now boots past gunicorn import and
+  fails fast in factory configuration validation:
+  `Error: SECRET_KEY is required`.
+
+**Remaining (operator-only, values are secrets or infrastructure the operator
+must provide):** set `SECRET_KEY` (≥32 generated chars), `DATABASE_URL`
+(PostgreSQL, `sslmode=verify-full`, dedicated `apex_app` runtime role,
+migrations `001`+`002` applied, per `docs/OPERATIONS.md`), the Fernet
+`OUTBOX_ENCRYPTION_KEY`, and `IDEMPOTENCY_HASH_KEYS` (≥2 × 32-char generated
+keys) on the Render service, then trigger a deploy. The factory fails fast
+with the name of the first missing key in the Render logs (values are never
+logged). Re-run **Render diagnostics** afterwards; the health endpoints
+(`/health/live`, `/health/ready`) then confirm readiness end-to-end before any
+browser login test.
+
 Application-side hardening already in `main` and covered by tests:
 same-origin requests are recognized by scheme/host/port and never require the
 cross-origin allowlist; hostile/malformed origins fail closed; flask-cors is
@@ -214,17 +240,23 @@ URLs and CSP `connect-src 'self'`.
 
 ## 9. Production verification status
 
-- Live today: **fails** — 403 `Cross-origin request blocked` reproduced on both
-  `https://apex.viability.in/api/auth/login` and
+- Live today (pre-fix): **fails** — 403 `Cross-origin request blocked`
+  reproduced on both `https://apex.viability.in/api/auth/login` and
   `https://apex-flow-7mr9.onrender.com/api/auth/login` because the last live
-  Render deploy (PR #1 era, manual, 2026-09-07) is still serving. Every
-  automatic deploy since (PRs #2–#5, including the same-origin login fix and
-  health endpoints) failed at boot with `AppImportError: Failed to find
-  attribute 'app' in 'backend.app'` because the Render service start command is
-  still `gunicorn backend.app:app`.
-- Repository `main`: full PostgreSQL suite green (CI runs for PRs #3–#6) and
+  Render deploy (PR #1 era, manual, 2026-09-07) kept serving while every
+  automatic deploy since (PRs #2–#5) failed at boot with `AppImportError:
+  Failed to find attribute 'app' in 'backend.app'` (Render service start
+  command was still `gunicorn backend.app:app`).
+- Applied 2026-09-08: start command changed to the factory form and
+  `TRUST_PROXY=1` + `ALLOWED_ORIGINS=https://apex.viability.in` added via the
+  Render API (verified). A triggered deploy then failed fast with
+  `Error: SECRET_KEY is required`, proving the app now boots into factory
+  configuration validation — the remaining blocker is operator-supplied
+  secrets and the PostgreSQL provisioned per `docs/OPERATIONS.md` (see §7).
+- Repository `main`: full PostgreSQL suite green (CI runs for PRs #3–#7) and
   the new contract tests pass locally and in CI.
-- **Login cannot go live until the Render service start command is changed to
-  `gunicorn 'backend.app:create_app()' ...` (with `TRUST_PROXY=1` and
-  `ALLOWED_ORIGINS=https://apex.viability.in` configured) and a browser login
-  on https://apex.viability.in succeeds.**
+- **Login cannot go live until the operator adds `SECRET_KEY`, `DATABASE_URL`
+  (PostgreSQL, `sslmode=verify-full`, `apex_app` role, migrations applied),
+  `OUTBOX_ENCRYPTION_KEY`, `IDEMPOTENCY_HASH_KEYS` on the Render service,
+  triggers a deploy, and a browser login on https://apex.viability.in
+  succeeds.**
