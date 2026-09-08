@@ -228,14 +228,20 @@ jobs:
         if: steps.diff.outputs.has_changes == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CATEGORY:    ${{ steps.parse.outputs.category }}
+          SUBCATEGORY: ${{ steps.parse.outputs.subcategory }}
+          DEPLOY_ID:   ${{ needs.observe.outputs.deploy_id }}
+          ATTEMPT:     ${{ needs.observe.outputs.attempt_count }}
+          MAX_ATTEMPTS: ${{ vars.MAX_REPAIR_ATTEMPTS || '2' }}
+          BRANCH:      agent/render-fix-${{ github.sha }}
+          RUN_URL:     ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           SHORT_SHA="${GITHUB_SHA:0:12}"
-          BRANCH="agent/render-fix-${SHORT_SHA}"
-          CATEGORY="${{ steps.parse.outputs.category }}"
-          SUBCATEGORY="${{ steps.parse.outputs.subcategory }}"
-          DEPLOY_ID="${{ needs.observe.outputs.deploy_id }}"
-          ATTEMPT="${{ needs.observe.outputs.attempt_count }}"
-          MAX_ATTEMPTS="${{ vars.MAX_REPAIR_ATTEMPTS || '2' }}"
+          CATEGORY="${CATEGORY}"
+          SUBCATEGORY="${SUBCATEGORY}"
+          DEPLOY_ID="${DEPLOY_ID}"
+          ATTEMPT="${ATTEMPT}"
+          MAX_ATTEMPTS="${MAX_ATTEMPTS}"
 
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
@@ -249,7 +255,7 @@ jobs:
           Attempt $((ATTEMPT + 1)) of ${MAX_ATTEMPTS}.
 
           Triggered by commit: ${GITHUB_SHA}
-          Workflow run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          Workflow run: ${RUN_URL}"
 
           git push origin "$BRANCH"
 
@@ -305,14 +311,7 @@ jobs:
             "--base",  "main",
           ], check=True, env={**os.environ})
           PREOF
-        env:
-          CATEGORY:    ${{ steps.parse.outputs.category }}
-          SUBCATEGORY: ${{ steps.parse.outputs.subcategory }}
-          DEPLOY_ID:   ${{ needs.observe.outputs.deploy_id }}
-          ATTEMPT:     ${{ needs.observe.outputs.attempt_count }}
-          MAX_ATTEMPTS: ${{ vars.MAX_REPAIR_ATTEMPTS || '2' }}
-          BRANCH:      agent/render-fix-${{ github.sha }}
-          RUN_URL:     ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
 
       # ── Optional: re-observe after deploy (AUTO_DEPLOY_RENDER=true) ──────
       # Only triggered when AUTO_DEPLOY_RENDER repository variable is "true".
