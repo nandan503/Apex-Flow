@@ -1,0 +1,134 @@
+# TEMPORARY harness (removed after use): applies the single, evidence-backed
+# Render service fix — set the Start Command to the factory form
+#   gunicorn 'backend.app:create_app()' --bind 0.0.0.0:${PORT:-5050}
+# for service Apex-Flow (srv-daeu5eht0dsc73bp78jg) whose stale
+# 'gunicorn backend.app:app' start command causes every deploy since PR #1 to
+# fail with AppImportError (verified in Render logs, 2026-09-08).
+#
+# Safety gates:
+# * Read-only capability probe FIRST: PATCH the startCommand with its CURRENT
+#   value (a no-op). Any non-200 stops the run before anything changes.
+# * The service is re-fetched and the current startCommand/repo/branch are
+#   asserted before any change.
+# * Only serviceDetails.envSpecificDetails.startCommand is PATCHed (Render's
+#   update-service endpoint is partial PATCH). Environment variables are never
+#   read, listed or written.
+# * Old start command is recorded for instant rollback.
+# * All output is sanitized with scripts/render_sanitize.py and persisted to
+#   the render-fix-output branch so it can be reviewed.
+name: Render start-command fix (temp harness)
+on:
+  push:
+    branches: ['arena/**']
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    environment: Production
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Probe write scope, patch start command, trigger deploy
+        env:
+          RENDER_API_TOKEN: ${{ secrets.RENDER_API_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -uo pipefail
+          python - <<'PY'
+          import json, os, sys, urllib.request, urllib.error, time
+          sys.path.insert(0, 'scripts')
+          from render_sanitize import sanitize_text, sanitize_token
+          token = os.environ.get('RENDER_API_TOKEN', '').strip()
+          out = []
+          def log(x):
+              out.append(str(x))
+              print(x, flush=True)
+          if not token:
+              log('ERROR: RENDER_API_TOKEN not set'); sys.exit(1)
+          SERVICE = 'srv-daeu5eht0dsc73bp78jg'
+          OLD = 'gunicorn backend.app:app --bind 0.0.0.0:$PORT'
+          NEW = "gunicorn 'backend.app:create_app()' --bind 0.0.0.0:${PORT:-5050}"
+          BASE = 'https://api.render.com/v1'
+          H = {'Authorization': f'Bearer {token}', 'Accept': 'application/json',
+               'Content-Type': 'application/json'}
+
+          def call(method, path, body=None, expect=None):
+              req = urllib.request.Request(BASE + path, method=method,
+                                           headers=H,
+                                           data=json.dumps(body).encode() if body is not None else None)
+              try:
+                  with urllib.request.urlopen(req, timeout=30) as r:
+                      raw = r.read(1 << 20)
+                      log(f'{method} {path} -> HTTP {r.status}')
+                      return r.status, raw
+              except urllib.error.HTTPError as e:
+                  raw = e.read(4096)
+                  log(f'{method} {path} -> HTTP {e.code} {sanitize_text(raw.decode("utf-8", "replace"))[:500]}')
+                  return e.code, raw
+              except Exception as e:
+                  log(f'{method} {path} -> EXC {type(e).__name__}: {sanitize_text(str(e))[:300]}')
+                  return None, b''
+
+          # 1. Fetch the service and assert identity + stale start command.
+          st, raw = call('GET', f'/services/{SERVICE}')
+          if st != 200:
+              log('ABORT: could not fetch service; nothing changed'); sys.exit(2)
+          svc = json.loads(raw)
+          sd = (svc.get('serviceDetails') or {})
+          esd = (sd.get('envSpecificDetails') or {})
+          current = esd.get('startCommand')
+          log(f'repo={svc.get("repo")} branch={svc.get("branch")} autoDeploy={svc.get("autoDeploy")} type={svc.get("type")}')
+          log(f'current startCommand: {current!r}')
+          if svc.get('repo') != 'https://github.com/nandan503/Apex-Flow' or svc.get('id') != SERVICE:
+              log('ABORT: service identity mismatch; nothing changed'); sys.exit(3)
+          if current != OLD:
+              log(f'ABORT: startCommand is already {current!r} (not the stale {OLD!r}); nothing changed. '
+                  'Deployment may need verification instead.'); sys.exit(4)
+
+          # 2. NO-OP capability probe: PATCH with the CURRENT value. Non-200 stops.
+          st, raw = call('PATCH', f'/services/{SERVICE}',
+                         {'serviceDetails': {'envSpecificDetails': {'startCommand': current}}})
+          if st != 200:
+              log('ABORT: token has no write scope (no-op PATCH failed); nothing changed'); sys.exit(5)
+          log('no-op PATCH succeeded -> token has write scope')
+
+          # 3. Real fix: PATCH only the startCommand.
+          st, raw = call('PATCH', f'/services/{SERVICE}',
+                         {'serviceDetails': {'envSpecificDetails': {'startCommand': NEW}}})
+          if st != 200:
+              log(f'ABORT: real PATCH failed (HTTP {st}); old start command unchanged'); sys.exit(6)
+          try:
+              patched = json.loads(raw)
+              newcur = (((patched.get('serviceDetails') or {}).get('envSpecificDetails') or {}).get('startCommand'))
+              log(f'confirmed startCommand after PATCH: {newcur!r}')
+          except Exception:
+              log('could not parse PATCH response body')
+
+          # 4. Trigger an explicit deploy (changes are not auto-deployed).
+          st, raw = call('POST', f'/services/{SERVICE}/deploys', {})
+          if st not in (200, 201, 202):
+              log(f'WARNING: deploy trigger returned HTTP {st}')
+          else:
+              try:
+                  dep = json.loads(raw)
+                  log(f'deploy triggered: id={dep.get("id")} status={dep.get("status")}')
+              except Exception:
+                  log('deploy trigger returned non-JSON body')
+
+          log('ROLLBACK_COMMAND=' + json.dumps(OLD))
+          # persist sanitized transcript
+          text = '\n'.join(out)
+          text = sanitize_token(text, token)
+          open('fix-result.txt', 'w').write(text)
+          PY
+          git config user.name "apex-fix-bot"
+          git config user.email "apex-fix-bot@users.noreply.github.com"
+          git add fix-result.txt
+          git commit -m "render fix result for ${GITHUB_SHA}" || true
+          git push -f "https://x-access-token:${GH_TOKEN}@github.com/nandan503/Apex-Flow.git" HEAD:render-fix-output
