@@ -82,6 +82,36 @@ uploads, generated reports or database files go on compute local disk. Process d
 must not require restoring its filesystem or sessions. No application schema job is
 run in a web startup command.
 
+## WSGI entrypoint (the only supported start command)
+
+`backend/app.py` exposes the application **factory** `create_app()` and intentionally
+defines no module-level Flask object. Every provider must therefore use Gunicorn's
+factory syntax, exactly as `Procfile`, `Dockerfile` and `render.yaml` already do:
+
+```sh
+gunicorn 'backend.app:create_app()' --bind 0.0.0.0:$PORT --workers ${WEB_CONCURRENCY:-2} --timeout 30
+```
+
+Importing `backend.app` opens no database connection and builds no application; the
+factory is safe to import under Gunicorn (including `--preload`) and each worker
+builds its own app. Startup performs only the read-only `validate_database()` checks
+(role privileges, applied migration checksums, table ownership/FORCE RLS) — no DDL,
+no migration, no seeding, no credential creation. Flask's development server is never
+started, and `DEBUG`/`TESTING` are rejected under `APP_ENV=production`.
+
+Do **not** "fix" a startup failure by adding a module-level `app = create_app()`: that
+would build an application (and connect to PostgreSQL) on every import, including in
+the CLI, the migration runner and the tests.
+
+Startup incident 2026-09-08: Render's Start Command was
+`gunicorn backend.app:app --bind 0.0.0.0:$PORT`, which aborts with
+`AttributeError: module 'backend.app' has no attribute 'app'` /
+`gunicorn.errors.AppImportError: Failed to find attribute 'app' in 'backend.app'`.
+The service never bound a port, so the browser saw the edge error page rather than any
+application response. Resolution: use the factory command above. A dashboard-created
+service does not read `render.yaml`; its Start Command must be corrected in the Render
+dashboard (Settings → Start Command) and the service redeployed.
+
 ## Canonical production login topology (2026-09-08)
 
 `https://apex.viability.in` → Cloudflare edge → provider service (e.g. apex-flow-7mr9.onrender.com)

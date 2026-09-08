@@ -63,8 +63,9 @@ pip install --require-hashes -r requirements.txt
    ```sh
    gunicorn 'backend.app:create_app()' --bind 0.0.0.0:5050 --workers 2 --timeout 30
    ```
-   Dockerfile and Procfile use the same factory. Live probe: `/health/live`.
-   Database readiness probe: `/health/ready`.
+   Dockerfile, Procfile and render.yaml use the same factory. There is no module-level
+   `app`/`application` object, so `gunicorn backend.app:app` fails by design.
+   Live probe: `/health/live`. Database readiness probe: `/health/ready`.
 
 **Existing installations:** the migration runner deliberately rejects an
 unversioned database. There is no safe way to infer tenant ownership from the old
