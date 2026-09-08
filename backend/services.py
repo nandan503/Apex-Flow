@@ -280,7 +280,7 @@ def create_vehicle(data):
         data.get('current_location', 'Delhi'), data.get('assigned_driver_id'),
         data.get('insurance_expiry', '2027-12-31'), data.get('permit_expiry', '2027-12-31'),
         data.get('fitness_expiry', '2027-12-31'), data.get('service_due_date', '2026-12-31'),
-        data.get('status', 'Available')
+        'Available'
     ))
     conn.commit()
     conn.close()
@@ -330,7 +330,7 @@ def create_driver(data):
         data['license_number'],
         data.get('license_expiry', '2028-12-31'), data.get('address', 'City Hub'),
         int(data.get('experience_years', 5)), data.get('assigned_vehicle_id'),
-        data.get('status', 'Available'), 0, 0, 5.0
+        'Available', 0, 0, 5.0
     ))
     conn.commit()
     conn.close()

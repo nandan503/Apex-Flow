@@ -51,6 +51,7 @@ def login():
 
 
 @api_bp.route('/auth/logout', methods=['POST'])
+@login_required
 def logout():
     session.clear()
     return json_response(message='Logged out successfully')

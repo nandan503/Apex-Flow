@@ -25,16 +25,16 @@ rules:
           def $FUNC(...):
               ...
       - pattern-not: |
-          @$BP.route("/api/auth/login", ...)
+          @$BP.route("/auth/login", ...)
           def $FUNC(...):
               ...
       - pattern-not: |
-          @$BP.route("/api/auth/logout", ...)
+          @$BP.route("/api/auth/login", ...)
           def $FUNC(...):
               ...
     paths:
       include:
-        - backend/routes.py
+        - "**/backend/routes.py"
 
   - id: apexflow-mass-assignment-status
     message: |
@@ -47,7 +47,7 @@ rules:
       - pattern: data.get('status', ...)
     paths:
       include:
-        - backend/services.py
+        - "**/backend/services.py"
 
   - id: apexflow-mass-assignment-payment
     message: |
@@ -59,7 +59,7 @@ rules:
       - pattern: data.get('payment_status', ...)
     paths:
       include:
-        - backend/services.py
+        - "**/backend/services.py"
 
   - id: apexflow-select-star
     message: |
@@ -71,7 +71,7 @@ rules:
       - pattern: cursor.execute("SELECT * FROM ...")
     paths:
       include:
-        - backend/
+        - "**/backend/**"
 
   - id: apexflow-updated-by-from-request
     message: |
@@ -84,7 +84,7 @@ rules:
           updated_by = data.get('updated_by', ...)
     paths:
       include:
-        - backend/routes.py
+        - "**/backend/routes.py"
 
   - id: apexflow-weak-otp
     message: |
@@ -96,7 +96,7 @@ rules:
       - pattern: uuid.uuid4().int % $N
     paths:
       include:
-        - backend/
+        - "**/backend/**"
 
   - id: apexflow-hardcoded-secret
     message: |
@@ -111,4 +111,5 @@ rules:
           regex: ".*(SECRET|PASSWORD|TOKEN|KEY|API_KEY).*"
     paths:
       include:
-        - backend/
+        - "**/backend/**"
+
