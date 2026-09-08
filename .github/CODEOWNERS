@@ -1,0 +1,32 @@
+# APEX FLOW CODEOWNERS
+#
+# Syntax: <path-pattern> <@owner> [<@owner2> ...]
+# Owners are automatically requested as reviewers for PRs touching those paths.
+# The LAST matching rule wins. More specific rules below override broader ones.
+#
+# Reference: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# ── Default: all files require review from maintainer ─────────────────────────
+*                          @nandan503
+
+# ── Backend: any change to the Flask API ─────────────────────────────────────
+/backend/                  @nandan503
+
+# ── Auth / RBAC / Security — always require explicit maintainer review ────────
+/backend/auth.py           @nandan503
+/backend/config.py         @nandan503
+/backend/logger.py         @nandan503
+
+# ── Database schema — explicit review for any schema change ───────────────────
+/backend/database.py       @nandan503
+
+# ── CI / workflow — changes to automation pipeline require maintainer sign-off ─
+/.github/                  @nandan503
+/.pre-commit-config.yaml   @nandan503
+/.semgrep.yml              @nandan503
+
+# ── Dependency management — CVE exposure on every change ──────────────────────
+/requirements.txt          @nandan503
+
+# ── Security documentation ────────────────────────────────────────────────────
+/docs/SECURITY_AUDIT.md    @nandan503

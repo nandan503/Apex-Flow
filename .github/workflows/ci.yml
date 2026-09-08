@@ -1,0 +1,182 @@
+# APEX FLOW — CI Pipeline
+# Runs on every PR and push to main.
+# Fast PR gate first (< 60s), integration tests second (matrix).
+# Secrets: none required for CI; Render deployment is triggered by push to main.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Principle of least privilege — read-only by default.
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  # ─────────────────────────────────────────────────────────────────────────────
+  # Job 1: Fast PR gate — runs in < 60 s
+  # Fails loudly on: syntax errors, secret leakage, SAST findings.
+  # ─────────────────────────────────────────────────────────────────────────────
+  fast-checks:
+    name: "Fast checks (syntax · secrets · SAST)"
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # Fetch full history so gitleaks can scan all commits in a PR
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install runtime dependencies
+        run: pip install -r requirements.txt
+
+      # ── Python syntax check ────────────────────────────────────────────────
+      - name: Python syntax check (py_compile)
+        run: |
+          python3 -m py_compile \
+            backend/app.py \
+            backend/auth.py \
+            backend/config.py \
+            backend/database.py \
+            backend/logger.py \
+            backend/models.py \
+            backend/reports.py \
+            backend/routes.py \
+            backend/services.py \
+            backend/tracking.py \
+            backend/utils.py
+          echo "✅ All Python files compile cleanly."
+
+      # ── Secret detection ───────────────────────────────────────────────────
+      # gitleaks scans the full git history for any committed secrets.
+      # On PRs it compares against the base branch.
+      - name: Secret scan (gitleaks)
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        # gitleaks-action reads GITHUB_TOKEN to auto-detect PR vs push context.
+        # No additional secrets are needed or passed to this step.
+
+      # ── SAST — custom Semgrep rules ────────────────────────────────────────
+      - name: SAST scan (Semgrep — APEX FLOW rules)
+        uses: returntocorp/semgrep-action@v1
+        with:
+          config: .semgrep.yml
+        env:
+          # Run only our local ruleset; no Semgrep App token needed.
+          SEMGREP_APP_TOKEN: ""
+
+      # ── Validate YAML workflow files ───────────────────────────────────────
+      - name: Validate CI YAML syntax
+        run: |
+          pip install pyyaml --quiet
+          python3 -c "
+          import yaml, glob, sys
+          errors = []
+          for f in glob.glob('.github/**/*.yml', recursive=True) + ['.pre-commit-config.yaml', '.semgrep.yml']:
+              try:
+                  yaml.safe_load(open(f))
+              except Exception as e:
+                  errors.append(f'{f}: {e}')
+          if errors:
+              print('YAML parse errors:')
+              for e in errors: print(' ', e)
+              sys.exit(1)
+          print('✅ All YAML files are valid.')
+          "
+
+      # ── Detect staged binary / generated artifacts ─────────────────────────
+      # This catches .pyc files, .db, or .env if they slip past .gitignore.
+      - name: Detect prohibited tracked files
+        run: |
+          PROHIBITED=$(git ls-files | grep -E '\.(pyc|pyo|db|sqlite|sqlite3)$|^\.env$|__pycache__' || true)
+          if [ -n "$PROHIBITED" ]; then
+            echo "❌ Prohibited files tracked in git:"
+            echo "$PROHIBITED"
+            exit 1
+          fi
+          echo "✅ No prohibited binary/generated files tracked."
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # Job 2: Integration tests — SQLite (no external services needed)
+  # Runs in parallel with fast-checks; merge requires both to pass.
+  # ─────────────────────────────────────────────────────────────────────────────
+  test-sqlite:
+    name: "Integration tests (SQLite)"
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: fast-checks   # Don't bother running if secrets or SAST failed.
+
+    env:
+      FLASK_ENV: testing
+      SECRET_KEY: ci-ephemeral-test-key-not-used-in-production
+      SEED_ADMIN_PASSWORD: ci_admin_pass
+      SEED_MANAGER_PASSWORD: ci_manager_pass
+      SEED_DRIVER_PASSWORD: ci_driver_pass
+      SEED_CUSTOMER_PASSWORD: ci_customer_pass
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install dependencies (including test extras)
+        run: |
+          pip install -r requirements.txt
+          pip install pytest pytest-cov
+
+      - name: Run tests
+        run: |
+          if [ -d tests ]; then
+            pytest tests/ -v --tb=short --cov=backend --cov-report=term-missing
+          else
+            echo "⚠️  No tests/ directory found. Skipping pytest."
+            echo "    See CONTRIBUTING.md §Testing — add tests before shipping features."
+          fi
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # Job 3: Dependency integrity — runs on push to main only (not on every PR)
+  # Checks for known CVEs in pinned packages using pip-audit.
+  # Slow but informational; does not block PRs, surfaces on merge.
+  # ─────────────────────────────────────────────────────────────────────────────
+  dependency-audit:
+    name: "Dependency CVE audit (pip-audit)"
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # Only block on main; PRs see results but dependency-audit is informational.
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Run pip-audit
+        run: |
+          pip install pip-audit --quiet
+          pip install -r requirements.txt --quiet
+          pip-audit --requirement requirements.txt --desc || true
+          # `|| true` makes this informational: failures are surfaced in the log
+          # but do not block main. Rotate to `exit 1` when known-clean baseline exists.
+          echo "ℹ️  Review pip-audit output above. CVEs require triage before next release."

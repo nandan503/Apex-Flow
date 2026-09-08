@@ -1,0 +1,58 @@
+name: Bug report
+description: Report a reproducible defect in APEX FLOW.
+labels: ["bug", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Before filing:** check the [API docs](../docs/API.md) and existing issues.
+
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened?
+      description: A clear, factual description of the unexpected behaviour.
+      placeholder: "When I POST /api/shipments with payload {...}, the server returns 500 instead of 201."
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Exact steps. Include curl commands or payloads where relevant.
+      placeholder: |
+        1. Start dev server: `python3 backend/app.py`
+        2. Login as admin
+        3. POST /api/shipments with `{"origin": ..., "destination": ...}`
+        4. Observe 500 response
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behaviour
+      placeholder: "Should return 201 with the new shipment object."
+    validations:
+      required: true
+
+  - type: input
+    id: python-version
+    attributes:
+      label: Python version
+      placeholder: "3.12.4"
+    validations:
+      required: false
+
+  - type: dropdown
+    id: environment
+    attributes:
+      label: Environment
+      options:
+        - Local (SQLite)
+        - Render (PostgreSQL)
+        - Railway (PostgreSQL)
+        - Other
+    validations:
+      required: true

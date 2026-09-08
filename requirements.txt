@@ -1,8 +1,20 @@
-Flask>=2.3.0
+# APEX FLOW — Python runtime dependencies
+# Minimum version bounds are set conservatively.
+# Pin exact versions in production using: pip freeze > requirements.lock
+# Then install in production with: pip install -r requirements.lock
+
+# ── Core framework ──────────────────────────────────────────────────────────────
+Flask>=2.3.0,<4.0
 flask-cors>=4.0.0
 flask-limiter>=3.5.0
 limits>=3.6.0
+Werkzeug>=2.3.0,<4.0
+
+# ── WSGI server (production) ───────────────────────────────────────────────────
 gunicorn>=21.2.0
-psycopg2-binary>=2.9.0
+
+# ── Database drivers ───────────────────────────────────────────────────────────
+psycopg2-binary>=2.9.0   # PostgreSQL (production); SQLite is stdlib
+
+# ── Configuration ─────────────────────────────────────────────────────────────
 python-dotenv>=1.0.0
-Werkzeug>=2.3.0

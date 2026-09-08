@@ -36,11 +36,17 @@ Be respectful, professional, and constructive in all interactions.
    python3 -m venv venv
    source venv/bin/activate
    pip install -r requirements.txt
-   pip install pre-commit semgrep
-   pre-commit install
+   pip install pre-commit semgrep pytest
    ```
-4. Copy `.env.example` to `.env` and configure for local development
-5. Run the dev server: `python3 backend/app.py`
+4. Install Git hooks (one-time):
+   ```bash
+   bash scripts/install-hooks.sh
+   ```
+   This installs:
+   - **commit-msg**: enforces Conventional Commits format on every commit
+   - **pre-commit**: runs gitleaks (secret detection) and semgrep (SAST) before each commit
+5. Copy `.env.example` to `.env` and configure for local development
+6. Run the dev server: `python3 backend/app.py`
 
 ---
 
@@ -168,7 +174,10 @@ What does this PR do?
 ### Merge Policy
 
 - Require at least **1 reviewer approval** before merging
-- All CI checks must pass
+- All CI checks must pass (see `.github/workflows/ci.yml`)
+  - `fast-checks`: syntax + secret scan + SAST (required for merge)
+  - `test-sqlite`: integration tests (required for merge)
+  - `dependency-audit`: CVE audit (runs on push to main; informational)
 - Use **Squash and Merge** for feature branches to keep `main` history clean
 - Delete the branch after merging
 
@@ -238,6 +247,74 @@ pre-commit run --all-files
 ```
 
 If a hook blocks your commit, fix the flagged issue before committing. Do **not** use `--no-verify` to bypass hooks.
+
+---
+
+## Git Recovery Procedures
+
+These are the most common recovery scenarios. **Never force-push to `main`.**
+
+### Accidentally committed to `main` directly (local, not yet pushed)
+```bash
+# Move the commit to a new branch and reset main
+git checkout -b fix/my-accidental-commit
+git checkout main
+git reset --hard HEAD~1
+```
+
+### Undo the last commit, keep changes staged
+```bash
+git reset --soft HEAD~1
+```
+
+### Undo the last commit, keep changes unstaged
+```bash
+git reset HEAD~1
+```
+
+### Remove a file accidentally staged (not yet committed)
+```bash
+git restore --staged path/to/file
+```
+
+### Accidentally committed a secret (not yet pushed)
+```bash
+# 1. Immediately remove the secret from the file
+# 2. Amend the commit
+git add path/to/fixed/file
+git commit --amend --no-edit
+# 3. Treat the secret as compromised and rotate it — amending does NOT remove
+#    the secret from the old reflog or from any copy that was cloned.
+```
+
+### Accidentally committed a secret (already pushed to a branch, not merged to main)
+```bash
+# This is a private feature branch. Rewriting it is acceptable.
+git rebase -i HEAD~N   # drop or edit the offending commit
+git push --force-with-lease origin feature/your-branch
+# Rotate the secret immediately — treat as compromised.
+```
+
+### Revert a bad merge on `main` (already merged, already pushed)
+```bash
+# Use revert — do NOT force-push main
+git revert -m 1 <merge-commit-sha>
+git push origin main
+```
+
+### Recover a deleted branch
+```bash
+# Find the SHA of the branch tip in the reflog
+git reflog | grep <branch-name>
+git checkout -b <branch-name> <sha>
+```
+
+### Resolve a botched rebase on your feature branch
+```bash
+git rebase --abort         # while rebase is in progress
+# or after the fact:
+git reset --hard origin/<your-branch>   # back to remote state
+```
 
 ---
 

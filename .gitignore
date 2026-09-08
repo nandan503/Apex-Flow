@@ -70,3 +70,32 @@ coverage.xml
 
 # Logs
 *.log
+logs/
+
+# Node (if frontend tooling is ever added)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS metadata
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# macOS extended attributes
+*.xattr
+
+# Coverage HTML reports
+htmlcov/
+
+# Temporary / scratch files
+*.tmp
+*.bak
+*.orig
+
+# ──────────────────────────────────────────────────────────────────────────────
+# NOTE: .git-hooks/ is intentionally tracked.
+# It contains the hook *source* files. Actual active hooks live in .git/hooks/
+# and are installed by running: bash scripts/install-hooks.sh
+# ──────────────────────────────────────────────────────────────────────────────
