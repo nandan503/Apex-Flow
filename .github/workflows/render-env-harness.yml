@@ -1,0 +1,65 @@
+# TEMPORARY harness (removed after use): sets the two NON-SECRET canonical
+# deployment variables on the Render service via the single-key add/update
+# endpoint (PUT /v1/services/{serviceId}/env-vars/{envVarKey}) — it touches
+# exactly one variable at a time and never lists or reads other variables.
+# Secret values (SECRET_KEY, DATABASE_URL, OUTBOX_ENCRYPTION_KEY,
+# IDEMPOTENCY_HASH_KEYS) are deliberately NOT handled here: only the operator
+# can supply them.
+name: Render env-var add (temp harness, non-secret only)
+on:
+  push:
+    branches: ['arena/**']
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    environment: Production
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Add non-secret deployment variables
+        env:
+          RENDER_API_TOKEN: ${{ secrets.RENDER_API_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          python - <<'PY'
+          import json, os, sys, urllib.request, urllib.error
+          sys.path.insert(0, 'scripts')
+          from render_sanitize import sanitize_text
+          token = os.environ.get('RENDER_API_TOKEN', '').strip()
+          out = []
+          def log(x):
+              out.append(str(x)); print(x, flush=True)
+          SERVICE = 'srv-daeu5eht0dsc73bp78jg'
+          BASE = 'https://api.render.com/v1'
+          VARS = {'TRUST_PROXY': '1',
+                  'ALLOWED_ORIGINS': 'https://apex.viability.in'}
+          if not token:
+              log('ERROR: RENDER_API_TOKEN not set'); sys.exit(1)
+          H = {'Authorization': f'Bearer {token}', 'Accept': 'application/json',
+               'Content-Type': 'application/json'}
+          for key, value in VARS.items():
+              req = urllib.request.Request(
+                  f'{BASE}/services/{SERVICE}/env-vars/{key}',
+                  method='PUT', headers=H,
+                  data=json.dumps({'value': value}).encode())
+              try:
+                  with urllib.request.urlopen(req, timeout=30) as r:
+                      raw = r.read(4096)
+                      log(f'PUT env-var {key} -> HTTP {r.status}')
+              except urllib.error.HTTPError as e:
+                  body = sanitize_text(e.read(2048).decode('utf-8', 'replace'))[:300]
+                  log(f'PUT env-var {key} -> HTTP {e.code} {body}')
+                  out.append(json.dumps({'key': key, 'failed': True}))
+              except Exception as e:
+                  log(f'PUT env-var {key} -> EXC {type(e).__name__}: {sanitize_text(str(e))[:200]}')
+          open('env-result.txt', 'w').write('\n'.join(out))
+          PY
+          git config user.name "apex-fix-bot"
+          git config user.email "apex-fix-bot@users.noreply.github.com"
+          git add env-result.txt
+          git commit -m "render env-var result for ${GITHUB_SHA}" || true
+          git push -f "https://x-access-token:${GH_TOKEN}@github.com/nandan503/Apex-Flow.git" HEAD:render-fix-output
