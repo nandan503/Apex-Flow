@@ -74,3 +74,7 @@ coverage.xml
 # Local configuration variants may contain secrets
 .env.*
 !.env.example
+
+# Locally generated diagnostics output (workflow artifacts are uploaded,
+# never committed)
+diagnostics/

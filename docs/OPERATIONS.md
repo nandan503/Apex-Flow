@@ -118,6 +118,12 @@ it does not authorize publishing unreviewed seed data.
 
 ## Probes, logs and required alerts
 
+For on-demand, sanitized Render deployment diagnostics and canonical health
+verification (GitHub Actions, manually triggered, read-only), see
+[RENDER_DIAGNOSTICS.md](RENDER_DIAGNOSTICS.md). It consumes only the
+`Production` environment secret `RENDER_API_TOKEN` and never reads Render
+environment variable values.
+
 - `/health/live`: process responds; no DB dependency, no credentials.
 - `/health/ready`: short database SELECT; 503 + Retry-After on outage. Schema checked
   at boot, not every probe. Readiness does not certify outbox delivery or storage HA.
