@@ -32,6 +32,7 @@ business records, idempotency results, audit events and outbox state live in Pos
 - [Security model and authorization matrix](docs/SECURITY_MODEL.md)
 - [Transaction, retry and external-delivery contracts](docs/DATA_CONTRACTS.md)
 - [Configuration, migration and operations runbook](docs/OPERATIONS.md)
+- [Render observability diagnostics workflow](docs/RENDER_DIAGNOSTICS.md)
 - [Verification evidence and remaining gates](SECURITY_AUDIT.md)
 
 ## Setup (explicit database lifecycle)

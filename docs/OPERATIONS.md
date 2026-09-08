@@ -134,6 +134,22 @@ var. Fixed in `backend/app.py::_origin_matches_request` with regression tests in
 → Cloudflare edge). Render "Application loading" interstitial observed via remote fetch during
 diagnosis — instance state, not an application defect.
 
+Deployment forensics and fix 2026-09-08 (Render API + logs, see `docs/LOGIN_INCIDENT_REPORT.md`):
+auto-deploy is enabled on the Render service (native Python runtime, branch `main`), but its
+dashboard **start command was `gunicorn backend.app:app`**, while current `main` exposes only
+the `create_app()` factory (no module-level `app`) — every auto-deploy since PR #1 built and
+then died with `AppImportError: Failed to find attribute 'app' in 'backend.app'`
+(`update_failed`); the last live deploy was the manual PR #1 deploy. On 2026-09-08 the service
+start command was changed (Render API partial PATCH) to
+`gunicorn 'backend.app:create_app()' --bind 0.0.0.0:${PORT:-5050}` and the non-secret
+variables `TRUST_PROXY=1` and `ALLOWED_ORIGINS=https://apex.viability.in` were added. A deploy
+then failed fast with `Error: SECRET_KEY is required`, confirming the factory boots and the
+remaining blocker is operator-supplied secrets plus the provisioned PostgreSQL: set SECRET_KEY,
+DATABASE_URL (sslmode=verify-full, apex_app runtime role, migrations 001+002 applied),
+OUTBOX_ENCRYPTION_KEY, IDEMPOTENCY_HASH_KEYS, then trigger a deploy and re-run the **Render
+diagnostics** workflow (`.github/workflows/render-diagnostics.yml`, `workflow_dispatch` on
+`main`) to verify deployment state and canonical health.
+
 Cloudflare routing is **compute redundancy only**. All providers currently depend on
 the same PostgreSQL authority and consumer. If that authority fails, switching compute
 does not fix the outage. No database/storage redundancy has been provisioned or tested.
@@ -147,6 +163,12 @@ forwarded headers. Development mode still needs PostgreSQL and real generated se
 it does not authorize publishing unreviewed seed data.
 
 ## Probes, logs and required alerts
+
+For on-demand, sanitized Render deployment diagnostics and canonical health
+verification (GitHub Actions, manually triggered, read-only), see
+[RENDER_DIAGNOSTICS.md](RENDER_DIAGNOSTICS.md). It consumes only the
+`Production` environment secret `RENDER_API_TOKEN` and never reads Render
+environment variable values.
 
 - `/health/live`: process responds; no DB dependency, no credentials.
 - `/health/ready`: short database SELECT; 503 + Retry-After on outage. Schema checked
