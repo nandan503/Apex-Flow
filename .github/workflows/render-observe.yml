@@ -120,6 +120,10 @@ jobs:
             --output diagnostics \
             --commit  "$OBSERVE_SHA" \
             --service-id "${RENDER_SERVICE_ID:-}"
+          OBS_EXIT=$?
+          # Numeric-only output; safe to surface to downstream jobs.
+          echo "observe_exit=${OBS_EXIT}" >> "$GITHUB_OUTPUT"
+          exit "${OBS_EXIT}"
 
       - name: Upload sanitized diagnostic bundle
         if: always() && steps.observe.outputs.deploy_status != 'live'
@@ -365,3 +369,132 @@ jobs:
           FAILURE_CLASSES: ${{ needs.observe.outputs.failure_classes }}
           DEPLOY_ID:       ${{ needs.observe.outputs.deploy_id }}
         run: python scripts/render_escalate.py
+
+  # ---------------------------------------------------------------------------
+  # Job 4: Observable evidence publisher (secret-free, strictly read-only)
+  #
+  # The observe job's full log lives in GitHub's log storage. This job mirrors
+  # the minimum observable facts — observe exit code + meaning, Render API
+  # connectivity, production HTTP status, and the already-sanitized diagnostic
+  # bundle — to a dedicated `obs/render-observe-<run_id>` branch so operators
+  # in restricted environments can read the outcome via git.
+  #
+  # SECURITY:
+  #   - This job receives NO secrets (no RENDER_API_KEY, no env from secrets).
+  #   - It issues only unauthenticated GET requests:
+  #       * https://api.render.com/v1              (connectivity probe; 401 expected)
+  #       * https://apex-flow-7mr9.onrender.com/   (production health probe)
+  #     Render is treated strictly read-only: no deploys, restarts, or mutations.
+  #   - All copied content already passed scripts/render_sanitize.py in the
+  #     observe step; the production response body is sanitized again here.
+  #   - The evidence branch is additive-only (new obs-evidence/ directory),
+  #     is never merged to main, and never triggers a Render deploy.
+  # ---------------------------------------------------------------------------
+  publish:
+    name: Publish observable evidence (no secrets)
+    needs: observe
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+
+    permissions:
+      contents: write    # to push the obs/ evidence branch
+      actions: read      # to download the sanitized diagnostic artifact
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download sanitized diagnostics artifact (if uploaded)
+        if: needs.observe.outputs.deploy_status != 'live'
+        uses: actions/download-artifact@v4
+        with:
+          name: render-diagnostics-${{ github.run_id }}-${{ github.run_attempt }}
+          path: diagnostics
+          if-no-files-found: ignore
+
+      - name: Collect evidence and push to obs branch
+        id: collect
+        env:
+          OBSERVE_EXIT:    ${{ needs.observe.outputs.observe_exit }}
+          DEPLOY_STATUS:   ${{ needs.observe.outputs.deploy_status }}
+          FAILURE_CLASSES: ${{ needs.observe.outputs.failure_classes }}
+          DEPLOY_ID:       ${{ needs.observe.outputs.deploy_id }}
+          NEEDS_HUMAN:     ${{ needs.observe.outputs.needs_human }}
+          OBSERVED_COMMIT: ${{ inputs.commit_sha || github.sha }}
+        run: |
+          set -uo pipefail
+          OUT="obs-evidence"
+          mkdir -p "$OUT"
+
+          # 1) Meaning of the observe exit code (see scripts/render_observe.py)
+          case "${OBSERVE_EXIT:-unknown}" in
+            0) MEANING="deployment LIVE" ;;
+            1) MEANING="config/usage error (RENDER_API_KEY missing in observe step env)" ;;
+            2) MEANING="Render API auth failed (HTTP 401) OR runner cannot reach api.render.com" ;;
+            3) MEANING="deployment failed or timed out (diagnostics bundle written)" ;;
+            4) MEANING="no Render service matched this repository" ;;
+            5) MEANING="ambiguous Render service match" ;;
+            6) MEANING="deployment not visible within initial wait window" ;;
+            *) MEANING="observe step did not complete (skipped or crashed)" ;;
+          esac
+
+          # 2) Unauthenticated connectivity probe to the Render API (expect 401)
+          API_CODE=$(curl -sS -o /dev/null -m 20 -w '%{http_code}' \
+            https://api.render.com/v1 2>/dev/null || echo 000)
+
+          # 3) Production application probe (unauthenticated GET /)
+          APP_CODE=$(curl -sS -o "$OUT/prod_response.html" -m 30 -w '%{http_code}' \
+            https://apex-flow-7mr9.onrender.com/ 2>/dev/null || echo 000)
+
+          # 4) Evidence manifest (status fields only — never credential values)
+          {
+            echo "# Render observe — observable evidence (secret-free)"
+            echo ""
+            echo "| Field | Value |"
+            echo "|---|---|"
+            echo "| run id | ${GITHUB_RUN_ID} (attempt ${GITHUB_RUN_ATTEMPT}) |"
+            echo "| workflow ref | \`${GITHUB_SHA}\` |"
+            echo "| observed commit | \`${OBSERVED_COMMIT}\` |"
+            echo "| observe exit code | \`${OBSERVE_EXIT:-unknown}\` |"
+            echo "| exit meaning | ${MEANING} |"
+            echo "| api.render.com (unauthenticated) | \`${API_CODE}\` (401 = network OK; 000 = unreachable) |"
+            echo "| production GET / | \`${APP_CODE}\` (200 = app responding) |"
+            echo "| deploy status | ${DEPLOY_STATUS:-n/a} |"
+            echo "| deploy id | ${DEPLOY_ID:-n/a} |"
+            echo "| failure classes | ${FAILURE_CLASSES:-n/a} |"
+            echo "| needs human | ${NEEDS_HUMAN:-n/a} |"
+            echo "| collected at (UTC) | $(date -u +%Y-%m-%dT%H:%M:%SZ) |"
+          } > "$OUT/evidence.md"
+
+          # 5) Push evidence to a dedicated branch (additive-only change)
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout -B "obs/render-observe-${GITHUB_RUN_ID}"
+          git add obs-evidence
+          git commit -m "obs(render-observe): evidence for run ${GITHUB_RUN_ID} (no secrets)"
+          git push origin "obs/render-observe-${GITHUB_RUN_ID}" --force
+
+          # 6) Mirror to the step summary (sanitized production body excerpt)
+          {
+            echo "## Observable evidence (secret-free)"
+            cat "$OUT/evidence.md"
+            echo ""
+            echo "Evidence pushed to branch \`obs/render-observe-${GITHUB_RUN_ID}\`."
+            if [ "${APP_CODE}" != "000" ] && [ -f "$OUT/prod_response.html" ]; then
+              echo ""
+              echo "### Production response excerpt (sanitized)"
+              echo '```'
+              python3 - "$OUT/prod_response.html" <<'PYEOF'
+          import sys
+          try:
+              from scripts.render_sanitize import sanitize_text
+          except Exception:
+              sanitize_text = lambda t: t
+          print(sanitize_text(open(sys.argv[1], "r", errors="replace").read()[:400]))
+          PYEOF
+              echo '```'
+            fi
+          } >> "${GITHUB_STEP_SUMMARY:-/dev/null}"
