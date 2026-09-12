@@ -76,12 +76,16 @@ slides 14–17 — the measured results, the limitations and the ordered plan ar
 
 Print from Chrome/Chromium (⌘P → **Save as PDF**):
 
-- Layout: **Landscape**, paper **A4** (or 1280 × 720 custom)
 - **Background graphics: on** — required, the deck's colour system is CSS backgrounds
-- Scale: 100 %; margins: none; headers/footers: off
+- Scale: **100 %** (not "Fit to page"); margins: **None**; headers/footers: **off**
+- Paper size does not need setting: the stylesheet declares `@page{size:1280px 720px}`, so each page is exactly one
+  slide at the designed aspect ratio
 
-`@media print` reveals every fragment on its slide, disables animation and inserts one page break per slide, so the
-PDF is exactly 18 pages.
+`@media print` reveals every fragment, disables animation, and neutralises the on-screen transform — then re-applies
+the *same* shrink factor that `autoFit()` chose for that slide (it is written to `--pz` and used as `zoom`), so a dense
+slide prints at the size it projects at instead of being cut off at the page edge. One page break per slide ⇒ exactly
+18 pages. If a slide does spill onto a second page, that is the deck refusing to hide text — shorten that slide rather
+than turning clipping back on.
 
 ## What is on each slide
 

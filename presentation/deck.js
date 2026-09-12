@@ -71,7 +71,8 @@
       const avail = pad(slide);
       box.style.width = '100%';
       box.style.transform = 'none';
-      if (box.scrollHeight <= avail + 1) return;             // already fits
+      slide.style.setProperty('--pz', '1');                   // print stylesheet reads this
+      if (box.scrollHeight <= avail + 1) return;              // already fits
       let best = 1;
       for (let it = 0; it < 8; it++) {
         box.style.width = (100 / best).toFixed(3) + '%';     // reflow wider, then scale
@@ -82,6 +83,7 @@
       box.style.transform = 'scale(' + best + ')';
       box.style.transformOrigin = 'top left';
       box.dataset.scale = best.toFixed(3);
+      slide.style.setProperty('--pz', best.toFixed(4));      // same factor on screen and on paper
     });
   }
   autoFit();

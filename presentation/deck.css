@@ -266,11 +266,16 @@ body.showhint #hint{opacity:1}
 
 /* ── print / PDF ─────────────────────────────────────────────────────── */
 @media print{
+  /* One slide per PDF page, at the designed aspect. Content is never clipped:
+     the on-screen auto-fit factor is reused as `zoom`, so paper matches the projector. */
+  @page{size:1280px 720px;margin:0}
   html,body{background:#fff;overflow:visible}
   #stage-wrap{position:static;display:block}
-  #stage{width:auto;height:auto;transform:none!important;box-shadow:none;overflow:visible}
-  .slide{position:relative;inset:auto;opacity:1!important;visibility:visible!important;transform:none!important;
-    page-break-after:always;height:720px;flex:none}
+  #stage{width:auto;height:auto;transform:none!important;box-shadow:none;overflow:visible;background:none}
+  .slide{position:relative;inset:auto;width:1280px;height:auto;min-height:720px;overflow:visible;
+    opacity:1!important;visibility:visible!important;transform:none!important;
+    page-break-after:always;break-inside:avoid;break-after:page;flex:none}
+  .slide>.fit{width:auto!important;transform:none!important;zoom:var(--pz,1)}
   .frag{opacity:1!important;transform:none!important}
   #bar,#pageno,#brand,#hint,#overlay,#notes{display:none!important}
 }
