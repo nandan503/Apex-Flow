@@ -78,8 +78,8 @@ Print from Chrome/Chromium (⌘P → **Save as PDF**):
 
 - **Background graphics: on** — required, the deck's colour system is CSS backgrounds
 - Scale: **100 %** (not "Fit to page"); margins: **None**; headers/footers: **off**
-- Paper size does not need setting: the stylesheet declares `@page{size:1280px 720px}`, so each page is exactly one
-  slide at the designed aspect ratio
+- Paper size does not need setting: the stylesheet declares `@page{size:1280px 724px}`, so each page is one slide at the
+  designed aspect ratio (16:9 plus 4 px of rounding slack)
 
 `@media print` reveals every fragment, disables animation, and neutralises the on-screen transform — then re-applies
 the *same* shrink factor that `autoFit()` chose for that slide (it is written to `--pz` and used as `zoom`), so a dense
