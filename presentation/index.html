@@ -403,6 +403,9 @@ delivery+OTP, invoice, notification.</div>
       <p style="margin-top:7px">And it is not a distance — it is a pseudo-random number derived from the letters of two city names, so a restart
       changes the price of an identical booking. Fix: the <span class="mono">routes</span> table already holds real distances; use them,
       or <span class="mono">zlib.crc32</span> for a stable pseudo-distance.</p>
+      <div class="small" style="margin-top:auto;padding-top:9px">Also: 18 % GST is hardcoded in <span class="mono">create_shipment</span>, so tax
+        policy lives in the service layer instead of configuration.</div>
+    </div>
     <div class="card frag" style="display:flex;flex-direction:column">
       <h3><span class="ic navy">🛰</span>“Live” tracking — a clock, not a GPS feed</h3>
       <div class="code" style="margin:9px 0"><header><span class="dot"></span><span class="path">backend/tracking.py · get_live_tracking_data()</span></header>
@@ -435,7 +438,6 @@ delivery+OTP, invoice, notification.</div>
   <div class="evidence"><span class="k2">backend/database.py · shipments CHECK(status IN …)</span><span class="k2">backend/services.py · update_shipment_status</span>
     <span class="k2">backend/tracking.py</span><span class="k2">backend/database.py · 4 seeded route rows (data/routes.json holds 2 and is read by nothing)</span>
     <span class="tag no">Reproduced defects ①–③ are mine to fix, not the framework's</span></div>
-  </div>
 </section>
 <!-- ══════════════════ 11 · OPS AUTOMATION ══════════════════ -->
 <section class="slide" data-title="Self-Diagnosing Deployment" data-notes="This is the part of the repo that is not a CRUD app: 1,121 lines of stdlib-only Python that read a deployment's logs and classify them. Present it as an experiment in bounded automation. Be explicit that the 'fix' stage currently only classifies and reports — I verified no code path mutates a file, so the PR branch never triggers. The escalation half does work.">
@@ -809,8 +811,8 @@ curl -s -b /tmp/c localhost:5050/api/reports/dashboard</div>
         write path that locks itself after one failure — plus proof that the parts that matter (IDOR, mass assignment, OTP
         lockout, SQL parameterisation) genuinely work.</p></div>
       <div class="card frag"><h3>What I learned</h3>
-        <p>Documentation is not enforcement: the audit says a control exists, the code says whether it fires. A single
-        un-<span class="mono">finally</span>-ed connection is an outage. And a simulation must be labelled, or it becomes a claim.</p></div>
+        <p>Documentation is not enforcement: the audit says a control exists, the code says whether it fires. A single connection written without a
+        <span class="mono">finally</span> is an outage. And a simulation must be labelled, or it becomes a claim.</p></div>
     </div>
     <div style="margin-top:22px;display:flex;justify-content:space-between;align-items:flex-end;gap:24px">
       <div class="small" style="max-width:62ch;line-height:1.6">

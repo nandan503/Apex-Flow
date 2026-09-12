@@ -493,6 +493,10 @@ if you finish the sentence.
 - **Fill in `META` at the top of `deck.js` (line 10) before the viva** (name, course, reviewer). Unfilled fields stay visibly
   marked, on screen and in the PDF — an unpersonalised title slide is the one self-inflicted wound available here.
 - `prefers-reduced-motion` is honoured; a `.no-anim` mode (press **A**) exists for room projectors that stutter.
+- **PowerPoint copy**: `presentation/Apex-Flow-deck.pptx` is generated from `index.html` by
+  `presentation/build_pptx.py` and audited by `presentation/check_pptx.py` (511 text units, 0 missing, 0 shapes
+  off-slide, notes on all 18 slides). It has **no click-to-reveal fragments** — python-pptx has no animation API —
+  and two dense cards sit at 7.4–7.6 pt. For the sequential-reveal version, present from `index.html`.
 - Nothing on any slide is decorative-only: every diagram node names a file, and every "verified" tag traces to
   section 8.
 

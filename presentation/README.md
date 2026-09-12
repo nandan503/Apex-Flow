@@ -108,6 +108,34 @@ than turning clipping back on.
 17. Future improvements — an ordered plan, each item deleting a bullet from slide 16
 18. Conclusion
 
+## PowerPoint version (`Apex-Flow-deck.pptx`)
+
+A native, editable 16:9 `.pptx` (18 slides, speaker notes on every slide) generated **from `index.html`**, so the two
+cannot drift in content. Rebuild and re-verify with:
+
+```bash
+pip install python-pptx
+python3 presentation/build_pptx.py     # rewrites Apex-Flow-deck.pptx, reports type sizes and any overflow
+python3 presentation/check_pptx.py     # exit 0 = every text unit survived, nothing off-slide, notes present
+```
+
+`check_pptx.py` audits the generated file against the HTML: it extracts every atomic text unit (paragraph, list item,
+heading, node label, chip, code line, table cell, evidence ref) and requires its words to appear **in the same order**
+on the matching slide — which is what catches a converter that silently drops or reorders content. It also fails on any
+shape outside the slide, on unintended shape overlap, and on missing speaker notes. Last run: **511 units, 0 missing**.
+
+Three honest differences from the HTML deck:
+
+1. **No click-to-reveal.** `python-pptx` has no animation API, so every slide is fully revealed. The fragments (`→`)
+   exist only in the browser version — if the sequential reveal matters for how you present, use `index.html`.
+2. **Type is smaller on the dense slides.** The HTML deck scales the whole slide; the `.pptx` shrinks individual cards.
+   Median card body is 10.8 pt, but two cards on slide 15 (*Challenges & Engineering Decisions* — "a hand-maintained
+   list is a bug generator" and "a demo that cannot be mistaken for the real thing") sit at 7.4–7.6 pt, and 10 cards
+   are estimated to run 0.05–0.09 in long. Both scripts print these, so
+   you can nudge the wording rather than discover it on a projector.
+3. **Not visually verified.** There is no PowerPoint renderer in this sandbox, so layout is checked structurally
+   (geometry, containment, content fidelity), not as pixels — the same caveat as the PDF export.
+
 ## Was this deck checked?
 
 `docs/PRESENTATION-NOTES.md` § 12 is the red-team pass: ten self-check questions, each answered by a *command* rather
