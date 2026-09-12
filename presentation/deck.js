@@ -1,6 +1,36 @@
 /* APEX FLOW deck engine — keyboard/click fragments, scaling, overview, notes.
    No external dependencies so the file works offline from disk or a static host. */
 (function () {
+  /* ── FILL THESE THREE IN, THEN PRESENT ───────────────────────────────────
+     Everything else in the deck is generated from the repository; these are
+     the only human details. Anything left empty stays marked as a placeholder
+     on the title slide so you cannot accidentally present with <your name> on
+     the projector. You can also skip this block and edit the three spans in
+     index.html directly (search for data-fill).                                              */
+  const META = {
+    name:     '',                       // e.g. 'Nandan Sharma'
+    course:   '',                       // e.g. 'B.Tech CSE · Final-year project · Thapar University'
+    reviewer: ''                        // e.g. 'Prof. <name>'
+  };
+
+  function applyMeta() {
+    let unfilled = 0;
+    document.querySelectorAll('[data-fill]').forEach(el => {
+      const v = META[el.getAttribute('data-fill')];
+      if (v && String(v).trim()) el.textContent = String(v).trim();
+      if (/</.test(el.textContent)) { el.classList.add('pending'); unfilled++; }
+    });
+    const title = document.querySelector('.slide[data-title="Title"]');
+    if (unfilled && title) {
+      const warn = document.createElement('div');
+      warn.className = 'metahint';
+      warn.textContent = '⚠ ' + unfilled + ' placeholder' + (unfilled > 1 ? 's' : '') +
+        ' still on this slide — set META in deck.js (line 10) before you present.';
+      title.appendChild(warn);
+    }
+  }
+  applyMeta();
+
   const stage = document.getElementById('stage');
   const wrap  = document.getElementById('stage-wrap');
   const slides = Array.from(stage.querySelectorAll('.slide'));

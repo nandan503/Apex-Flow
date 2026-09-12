@@ -89,9 +89,10 @@ on the slides, with the reproductions.
 15. How would this behave with 1,000 concurrent shipments? What breaks first?
 16. Which part of this codebase are you least proud of?
 17. If you had one week, what would you fix first — and why that order?
-18. Is a `SELECT *` in `get_shipment_by_id()` a problem? Your Semgrep rule was written to catch it.
-19. How do you prevent a customer from reading another customer's shipment? Show me the code.
-20. This looks like a management information system, not a logistics *system*. What is missing to make it one?
+18. Does the system actually dispatch a vehicle and a driver to a shipment?
+19. Is a `SELECT *` in `get_shipment_by_id()` a problem? Your Semgrep rule was written to catch it.
+21. How do you prevent a customer from reading another customer's shipment? Show me the code.
+22. This looks like a management information system, not a logistics *system*. What is missing to make it one?
 
 ---
 
@@ -216,7 +217,9 @@ functions, add `errorhandler(Exception)` so failures stop leaking SQL text, add 
 (5) either let `render_fix.py` write its one safe fix or delete the stage — half a day. Reasoning for the order: user-visible
 breakage first, then verifiability, then hardening, then scale.
 
-**18 — `SELECT *`.** Two answers. In principle it is the smell that F-10 was about: `get_shipment_by_id()` and friends
+**18 — Dispatch.** No — and I can show the exact chain, which is the most instructive bug in the repo because four separate layers are each individually defensible. `frontend/shipments.html` renders `#shipmentVehicle` and `#shipmentDriver` selects; `frontend/js/shipments.js:61-62` posts them as `vehicle_reg` and `driver_name`; `_SHIPMENT_ALLOWED_FIELDS` (`services.py:23`) contains neither, so the allowlist filter drops them; `create_shipment()` then writes the literal `None, None, None, None` into `vehicle_id, vehicle_reg, driver_id, driver_name` (`services.py:113-124`); and there is no assignment endpoint — `grep -n "UPDATE vehicles\|SET vehicle_id" backend/*.py` returns nothing. So *no shipment is ever dispatched*, which is why `tracking.py:55-57` substitutes `VEH001` / `HR26BX4587` / “Rajesh Kumar” to keep the UI alive. The security fix (F-02) and the domain need collided, and the allowlist won: the correct resolution is not to widen the allowlist blindly but to add `vehicle_id`/`driver_id` to it **with an ownership + availability check** (`vehicles.status = 'Available'`), plus a `PUT /api/shipments/:id/assignment` so assignment is a deliberate, audited action rather than a side effect of booking.
+
+**19 — `SELECT *`.** Two answers. In principle it is the smell that F-10 was about: `get_shipment_by_id()` and friends
 `SELECT *`, and only the fact that `deliveries` is queried with an explicit column list keeps the OTP out of the API.
 In practice, the guard meant to catch it does not work: I planted a `SELECT *` call in the backend and
 `apexflow-select-star` never matched — its pattern is a *literal* string, so `cursor.execute("SELECT * FROM users
@@ -254,6 +257,7 @@ Ordered by how damaging they look, with whether I raise them first.
 | No state-machine transition validation | Reproduced: `Delivered → Booked` → 200; a DRIVER moved an unassigned shipment to `Returned`. | Yes — slides 10, 12, 14. |
 | Front end interpolates server strings into `innerHTML` with no escaping | Code-level finding (24 sites); stored payload returned verbatim. I could **not** execute it — no browser in the sandbox. | Yes — slide 16, with the caveat stated. |
 | Docs/README overstate: "6 Semgrep rules" (there are 7), "9-layer sanitization" (3 layers / 10 patterns), `LICENSE` referenced but absent, `data/*.json` never read | All confirmed by reading + grep. | Yes — slides 11, 13, 16. |
+| Nothing ever assigns a vehicle or driver | Full chain verified: UI selects → `shipments.js:61` posts `vehicle_reg`/`driver_name` → not in the allowlist → written `NULL` → no assignment endpoint → `tracking.py:55` fabricates `VEH001`. | Yes — slides 10, 14. |
 | `maintenance_records` table exists with no read/write path anywhere | `grep -rn maintenance_records backend/` → only the `CREATE TABLE`. | Mention if asked about dead code. |
 | Settings page and the dashboard's "Focus Telemetry" button are stubs | The form's `onsubmit` only shows a toast; the button fires a hardcoded toast string. | Mention if asked about UX completeness. |
 | Plaintext seed credentials in git history | Audit says "Mitigated"; allowlisted by SHA after rotation. | Yes — slide 12/16, and the answer to Q13. |
@@ -324,6 +328,7 @@ have to run it. Here is the experiment I would run." Then state the experiment. 
 | Client may pick the customer | `backend/services.py:103` | `data.get('customer_id', 'CUST001')` | fresh DB: omit → `CUST001`, send `CUST003` → stored `CUST003` (201), unknown → 500 |
 | Booking writes 5 rows | `backend/services.py:77` | `create_shipment` | grep of the function: 5 `INSERT INTO` (shipments, history, deliveries, payments, notifications), 1 `commit()`, 1 `close()` |
 | Deleting an invoiced shipment fails | `backend/services.py:238` | `delete_shipment` | ADMIN `DELETE /api/shipments/SHP002` → 500 `FOREIGN KEY constraint failed` (`payments` has no `ON DELETE CASCADE`) |
+| Dispatch never happens | `backend/services.py:113` | `create_shipment` INSERT tuple | posts `vehicle_reg`/`driver_name`; both outside `_SHIPMENT_ALLOWED_FIELDS`; `None, None, None, None` stored; `grep 'SET vehicle_id' backend/*.py` → empty |
 | Only 4 corridors are real | `backend/database.py:412` | `seed_demo_data` `routes_data` | 4 rows (`RTE001` Delhi–Jaipur 286 km … `RTE004`); `data/routes.json` has 2 rows and no reader |
 | Tracking is simulated | `backend/tracking.py:28` | `get_live_tracking_data` | progress 10 %→14 % in 4 s, identical across vehicles |
 | Route heuristic | `backend/routes.py:249` | `optimize_route` | Ludhiana→Chennai 430 km; →"Che" 382 km; Delhi→Jaipur → cached `RTE001` |
@@ -335,6 +340,9 @@ have to run it. Here is the experiment I would run." Then state the experiment. 
 | SAST rule inert | `.semgrep.yml` | `apexflow-select-star` | planted `SELECT *` not matched; 16 real sites in `backend/` |
 | Ops-agent counts | `scripts/render_observe.py:85` | `FAILURE_PATTERNS` | 21 rows → 12 distinct (category, subcategory) pairs over 4 categories |
 | Redaction depth | `scripts/render_sanitize.py:73` | `_REDACTION_PATTERNS` | 10 patterns, 3 public entry points (`sanitize_json`, `sanitize_text`, `sanitize_token`); docs claim 9 layers |
+| No pagination on list endpoints | `backend/reports.py:35,39` | only `LIMIT`s in the backend | `grep -c "\bLIMIT\b" backend/*.py` → 2 (dashboard side-panels), `OFFSET` → 0 |
+| Single 429 handler; dead helpers | `backend/app.py:51`, `backend/logger.py:104` | `log_app_error` | `grep errorhandler backend/*.py` → only 429; `log_app_error` has 0 call sites; correlation-ID/request-id refs → 0; `CREATE INDEX` → 0 |
+| Two UI stubs | `frontend/settings.html`, `frontend/js/dashboard.js:69` | `trackLiveDemo` | settings form is `onsubmit="event.preventDefault(); showToast(…)"` with no API call; the dashboard button toasts a hardcoded vehicle/ETA string |
 | Fixer can never succeed | `scripts/render_fix.py:202` | `main()` | both fixers return only 1 or 2, so `if result == 0:` (validation + PR) is unreachable; workflow gate is `git diff --quiet HEAD` |
 
 **Code-level inference only** (say so if asked):
@@ -399,6 +407,26 @@ cp backend/services.py backend/routes.py /tmp/probe_backup/
 semgrep --config .semgrep.yml backend/ --json | jq '.results[].check_id'
 cp /tmp/probe_backup/*.py backend/
 
+# one-shot re-measure of every count printed on the slides (~2 s, read-only)
+python3 - <<'EOF'
+import re,glob,os
+L=lambda p:"".join(open(f).read() for f in glob.glob(p))
+b=L("backend/*.py"); j=L("frontend/js/*.js")
+print("backend LOC      ", sum(len(open(f).read().splitlines()) for f in glob.glob("backend/*.py")), "(expect 1,914)")
+print("js LOC / modules ", sum(len(open(f).read().splitlines()) for f in glob.glob("frontend/js/*.js")), "/", len(glob.glob("frontend/js/*.js")), "(1,199 / 14)")
+print("html LOC / pages ", sum(len(open(f).read().splitlines()) for f in glob.glob("frontend/*.html")), "/", len(glob.glob("frontend/*.html")), "(2,019 / 15)")
+print("css LOC / files  ", sum(len(open(f).read().splitlines()) for f in glob.glob("frontend/css/*.css")), "/", len(glob.glob("frontend/css/*.css")), "(1,109 / 5)")
+print("route handlers   ", len(re.findall(r"@api_bp.route", L("backend/routes.py"))), "(26)   auth decorators:", len(re.findall(r"@login_required|@require_role", L("backend/routes.py"))), "(25)")
+print("tables / FK decl ", len(re.findall(r"CREATE TABLE IF NOT EXISTS", L("backend/database.py"))), "/", len(re.findall(r"FOREIGN KEY", L("backend/database.py"))), "(12 / 5 on 5 tables)")
+print("SELECT * sites   ", len(re.findall(r"SELECT \* FROM", b)), "(16)   innerHTML sites:", len(re.findall(r"innerHTML", j)), "(24)")
+print("innerHTML+interp", len(re.findall(r"\$\{[^}]*\}", j)), "template interpolations; escaping helper:", "escapeHtml" in j or "sanitize" in j)
+print("semgrep rules    ", len(re.findall(r"id: apexflow", open(".semgrep.yml").read())), "(7)")
+# do NOT use glob("tests/**") here: CPython returns a phantom ['tests/'] for a missing dir
+print("tests/ present   ", os.path.isdir("tests"), "| test files tracked:",
+      len([l for l in __import__("subprocess").run("git ls-files",shell=True,capture_output=True,text=True).stdout.split("\n")
+           if re.search(r"(^|/)(test_[^/]*|[^/]*_test)\.py$", l)]), "(False / 0 — this is why the CI test job skips)")
+EOF
+
 # static gates, exactly as CI runs them
 python3 -m py_compile backend/*.py
 semgrep --config .semgrep.yml backend/ --error
@@ -455,6 +483,8 @@ if you finish the sentence.
   `frontend/css/style.css` (`--primary-navy`, `--accent-blue`, `--success`, `--warning`, `--danger`) so the deck looks
   like the artefact it describes. Contrast: `--ink #0b1f3a` on `--bg #f6f8fc` ≈ 13:1; body text ≥ 11.4 px at 1280 × 720
   (≈ 21 px on a 1920 projector).
+- **Fill in `META` at the top of `deck.js` (line 10) before the viva** (name, course, reviewer). Unfilled fields stay visibly
+  marked, on screen and in the PDF — an unpersonalised title slide is the one self-inflicted wound available here.
 - `prefers-reduced-motion` is honoured; a `.no-anim` mode (press **A**) exists for room projectors that stutter.
 - Nothing on any slide is decorative-only: every diagram node names a file, and every "verified" tag traces to
   section 8.

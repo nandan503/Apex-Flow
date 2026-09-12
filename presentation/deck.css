@@ -291,3 +291,14 @@ table.dense .mono-cell{font-size:11.3px;line-height:1.45}
 .rise{opacity:0}
 .slide.active .rise{animation:rise .7s cubic-bezier(.22,.61,.36,1) both;animation-delay:var(--d,0s)}
 @media print{.rise{opacity:1!important;animation:none!important}}
+
+/* ── unsubmitted personalisation ──────────────────────────────────────────
+   Title-slide fields that still contain a <placeholder>. Deliberately loud:
+   a forgotten "<your name>" on the projector is the one avoidable mistake
+   in this whole deck. */
+.m2.pending{color:var(--warn);background:rgba(245,158,11,.13);border:1px dashed var(--warn);
+  border-radius:7px;padding:1px 7px;margin:-1px -7px}
+.metahint{position:absolute;left:62px;bottom:44px;font-size:12.5px;font-weight:600;
+  color:#7a4a02;background:rgba(245,158,11,.16);border:1px solid rgba(245,158,11,.45);
+  border-radius:9px;padding:7px 12px;max-width:62ch}
+@media print{.metahint{display:none!important}}

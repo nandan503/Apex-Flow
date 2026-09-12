@@ -23,9 +23,9 @@
     </div>
     <div class="meta rise" style="--d:.4s">
       <div><div class="m1">Repository</div><div class="m2 mono">nandan503/Apex-Flow</div></div>
-      <div><div class="m1">Student</div><div class="m2">&lt;your name&gt;</div></div>
-      <div><div class="m1">Course · Institution</div><div class="m2">&lt;fill in&gt;</div></div>
-      <div><div class="m1">Reviewer</div><div class="m2">&lt;professor&gt;</div></div>
+      <div><div class="m1">Student</div><div class="m2" data-fill="name">&lt;your name&gt;</div></div>
+      <div><div class="m1">Course · Institution</div><div class="m2" data-fill="course">&lt;fill in&gt;</div></div>
+      <div><div class="m1">Reviewer</div><div class="m2" data-fill="reviewer">&lt;professor&gt;</div></div>
     </div>
   </div>
   <div class="evidence">
@@ -222,7 +222,7 @@ delivery+OTP, invoice, notification.</div>
   <h2>Thin routes, fat services, no SQL in the view layer</h2>
   <div class="grid grow" style="grid-template-columns:1.02fr 1fr;gap:20px">
     <div class="code frag" style="align-self:start">
-      <header><span class="dot"></span><span class="path">Apex-Flow/</span><span class="note">LOC per area · Python 1,914 · JS 1,199 · HTML 2,019 · CSS 1,109 · docs+scripts 3,241</span></header>
+      <header><span class="dot"></span><span class="path">Apex-Flow/</span><span class="note">LOC per area · Python 1,914 · JS 1,199 · HTML 2,019 · CSS 1,109 · docs+scripts 3,241 (excl. the deck and notes added for this review)</span></header>
       <pre style="font-size:12.1px;line-height:1.72"><span class="l"><span class="p">Apex-Flow/</span></span><span class="l"><span class="p">├──</span> <span class="f">backend/</span>        <span class="c"># 1,914 lines — Flask REST API, 11 modules</span></span><span class="l"><span class="p">│   </span>├── <span class="w">app.py</span>         <span class="c"># 102 · WSGI entry, CORS, limiter, cookies, static</span></span><span class="l"><span class="p">│   </span>├── <span class="w">routes.py</span>      <span class="c"># 379 · Blueprint, 26 handlers over 21 paths, zero business logic</span></span><span class="l"><span class="p">│   </span>├── <span class="w">auth.py</span>        <span class="c">#  94 · @login_required, @require_role, authenticate_user</span></span><span class="l"><span class="p">│   </span>├── <span class="w">services.py</span>    <span class="c"># 526 · shipment/OTP/invoice/notification logic</span></span><span class="l"><span class="p">│   </span>├── <span class="w">database.py</span>    <span class="c"># 459 · schema, seed, SQLite↔Postgres wrapper</span></span><span class="l"><span class="p">│   </span>├── <span class="w">tracking.py</span>    <span class="c">#  96 · time-parameterised position simulation</span></span><span class="l"><span class="p">│   </span>├── <span class="w">reports.py</span>     <span class="c">#  84 · dashboard KPIs, 4 analytics projections</span></span><span class="l"><span class="p">│   </span>├── <span class="w">logger.py</span>      <span class="c"># 106 · structured JSON events, PII redaction</span></span><span class="l"><span class="p">│   </span>└── <span class="w">config/models/utils</span> <span class="c"># 68 · env config, row→dict, response envelope</span></span><span class="l"><span class="p">├──</span> <span class="f">frontend/</span>       <span class="c"># 15 pages · 14 js modules · 5 css · no build step</span></span><span class="l"><span class="p">│   </span>├── <span class="w">js/app.js</span>      <span class="c"># 204 · fetchAPI(), toasts, session bootstrap, drawer</span></span><span class="l"><span class="p">│   </span>├── <span class="w">js/*.js</span>        <span class="c"># one module per page, DOM-only rendering</span></span><span class="l"><span class="p">│   </span>└── <span class="w">css/style.css</span>  <span class="c"># design tokens in :root → deck palette</span></span><span class="l"><span class="p">├──</span> <span class="f">scripts/</span>        <span class="c"># 1,121 · Render observe / sanitize / fix / escalate</span></span><span class="l"><span class="p">├──</span> <span class="f">.github/</span>        <span class="c"># ci.yml ×3 jobs · render-observe.yml ×3 · CODEOWNERS</span></span><span class="l"><span class="p">├──</span> <span class="f">docs/</span>           <span class="c"># API · AUDIT · DEPLOYMENT · CONTRIBUTING · render-agent</span></span><span class="l"><span class="p">└──</span> <span class="f">data/</span>           <span class="c"># 6 seed JSON files — <span class="w">not read by any code path</span></span></span><span class="l"><span class="p">    </span><span class="c">   (seeding lives in database.py:seed_demo_data)</span></span><span class="l"><span class="p">    </span><span class="c">   apexflow.db excluded by .gitignore</span></span></pre>
     </div>
     <div class="stack" style="justify-content:flex-start">
@@ -281,7 +281,7 @@ delivery+OTP, invoice, notification.</div>
       <div class="code frag"><header><span class="dot"></span><span class="path">backend/routes.py · add_shipment()</span></header>
 <pre><span class="l"><span class="at">@api_bp</span>.route(<span class="s">'/shipments'</span>, methods=[<span class="s">'POST'</span>])</span><span class="l"><span class="at">@login_required</span></span><span class="l"><span class="k">def</span> <span class="f">add_shipment</span>():</span><span class="l">    data = request.get_json() <span class="k">or</span> {}</span><span class="l">    pickup = data.get(<span class="s">'pickup_location'</span>) <span class="k">or</span> data.get(<span class="s">'pickup'</span>)</span><span class="l">    destination = data.get(<span class="s">'destination'</span>)</span><span class="l">    <span class="k">if not</span> pickup <span class="k">or not</span> destination:</span><span class="l">        <span class="k">return</span> error_response(<span class="s">'Pickup and destination are required'</span>, <span class="n">400</span>)</span><span class="l">    shipment = create_shipment(data,</span><span class="l">        caller_user_id=session.get(<span class="s">'user_id'</span>),   <span class="c"># identity, not payload</span></span><span class="l">        caller_role=session.get(<span class="s">'role'</span>))</span><span class="l">    <span class="k">return</span> json_response(data=shipment, message=<span class="s">"Shipment created successfully"</span>,</span><span class="l">                         status_code=<span class="n">201</span>)</span></pre></div>
       <div class="card frag"><h3>Measured on a live instance</h3>
-        <p>Locally, one complete booking (auth + 4 inserts + commit + read-back) finished in <b>10 ms</b>. That is not a
+        <p>Locally, one complete booking (auth + 5 inserts + commit + read-back) finished in <b>10 ms</b>. That is not a
         benchmark — it shows where the time <i>isn't</i> going: no pool, no cache, no network hop, no queue.</p></div>
       <div class="card warn frag"><h3>Two shortcuts visible in this path</h3>
         <p>① The status flow <span class="mono">PUT /shipments/:id/status</span> skips validation entirely — any of the 10 enum
@@ -413,8 +413,11 @@ delivery+OTP, invoice, notification.</div>
         <li>Distance uses <span class="mono">√(Δlat²+Δlng²)×111</span> — a flat-earth approximation, fine for a demo, wrong across
         India's latitude span.</li>
         <li>With no in-transit shipment the module returns a <b>hardcoded</b> SHP001 record, so the UI always looks alive.</li>
+        <li>The fallback is load-bearing, not lazy: <span class="mono">shipments.js:61</span> posts <span class="mono">vehicle_reg</span> and
+          <span class="mono">driver_name</span>, <b>neither is in the booking allowlist</b>, so all four assignment columns are written
+          <span class="mono">NULL</span> — and no endpoint can set them afterwards. <i>Every</i> shipment is unassigned, so tracking must invent a vehicle.</li>
       </ul>
-      <div class="small" style="margin-top:auto;padding-top:9px">A real feed needs a device ingest endpoint + a position table; the current shape already supports that swap.</div>
+      <div class="small" style="margin-top:auto;padding-top:9px">A real feed needs three things: device ingest, a position table, and a dispatch step that actually assigns the vehicle the operator picked. The response shape already supports the first two.</div>
     </div>
     <div class="card frag" style="display:flex;flex-direction:column">
       <h3><span class="ic navy">🧭</span>Route “optimisation” — cache-then-heuristic</h3>
@@ -585,7 +588,7 @@ delivery+OTP, invoice, notification.</div>
 <section class="slide" data-title="Results — What I Measured" data-notes="This is the slide that separates me from a student who only read the README. Every row was executed against a live instance. Read three rows out loud: the mass-assignment neutralisation (works), the login rate limit (documented but not enforced), and the FK-then-lock cascade (a real bug with a real root cause). Offer the reproduction script if asked.">
   <div class="band"></div>
   <div class="eyebrow">13 · Results &amp; verification</div>
-  <h2>I ran the system, not just the analysis — 15 claims, measured</h2>
+  <h2>I ran the system, not just the analysis — 16 claims, measured</h2>
   <div class="grid grow" style="grid-template-columns:1.5fr 1fr;gap:16px">
     <div class="frag">
       <table class="dense" style="font-size:12px">
@@ -602,6 +605,7 @@ delivery+OTP, invoice, notification.</div>
         <tr><td>Parameterised SQL (no injection)</td><td class="mono-cell"><span class="mono">?search=' OR 1=1--</span> → 200 with an empty list; 16 <span class="mono">SELECT *</span> queries all use <span class="mono">?</span> binds</td><td class="c"><span class="tag ok">pass</span></td></tr>
         <tr><td>Login limited to 10 / minute</td><td class="mono-cell">25 rapid bad logins → 25 × 401, <b>no 429</b>, no X-RateLimit headers. Reproduced on flask-limiter 4.1.1 <i>and</i> 3.5.1</td><td class="c"><span class="tag no">fail</span></td></tr>
         <tr><td>Default limit 200 / minute</td><td class="mono-cell">first 429 at request <b>201</b>, with <span class="mono">X-RateLimit-*</span> headers → proves the limiter works, only the per-route attach is broken</td><td class="c"><span class="tag ok">pass</span></td></tr>
+        <tr><td>Every shipment is dispatched to a vehicle and driver</td><td class="mono-cell">the form's two selects are posted, dropped by the field allowlist and stored <span class="mono">NULL</span>; no assignment endpoint exists — <span class="mono">/api/tracking</span> falls back to <span class="mono">VEH001</span> / “Rajesh Kumar”</td><td class="c"><span class="tag no">gap</span></td></tr>
         <tr><td>Booking is safe for any role</td><td class="mono-cell">CUSTOMER booking → 500: <span class="mono">FOREIGN KEY constraint failed</span> (<span class="mono">customer_id := user_id “USR004”</span>, absent from <span class="mono">customers</span>)</td><td class="c"><span class="tag no">fail</span></td></tr>
         <tr><td>DB connections are released</td><td class="mono-cell">one failed write leaks the connection → next valid write fails after 5.02 s with <span class="mono">database is locked</span> (reproduced deterministically; 20 concurrent <i>valid</i> writes all succeeded in 0.15 s, so it is the leak, not contention)</td><td class="c"><span class="tag no">fail</span></td></tr>
         <tr><td>Shipment lifecycle is a state machine</td><td class="mono-cell">no transition table exists: <span class="mono">Delivered → Booked</span> accepted with <span class="mono">200</span>; a DRIVER updated an unassigned shipment</td><td class="c"><span class="tag no">gap</span></td></tr>
@@ -709,7 +713,7 @@ curl -s -b /tmp/c localhost:5050/api/reports/dashboard</div>
           <li>A failed write <b>leaks the connection</b> and poisons every later write for the process&rsquo;s lifetime.</li>
           <li><b>Freight cost is a salted hash</b>, so invoices are irreproducible; GST (18 %) is a literal.</li>
           <li>Distance, ETA and speed come from <b>string lengths and a clock</b>; 3 seeded deliveries still carry 4-digit OTPs.</li>
-          <li>No state-machine validation; <b>no indexes</b> beyond PK/UNIQUE; no pagination, so <span class="mono">LIKE &rsquo;%x%&rsquo;</span> scans grow linearly.</li>
+          <li>No state-machine validation; <b>no indexes</b> beyond PK/UNIQUE; no pagination on any list endpoint (the only <span class="mono">LIMIT</span>s in the backend are the two dashboard side-panels, <span class="mono">reports.py:35,39</span>), so <span class="mono">LIKE &rsquo;%x%&rsquo;</span> scans grow linearly.</li>
           <li><span class="mono">DELETE /api/shipments/:id</span> 500s whenever an invoice exists — the <span class="mono">payments</span> FK has no <span class="mono">ON DELETE CASCADE</span> (measured).</li>
         </ul></div>
       <div class="card bad frag"><h3><span class="ic bad">✗</span>Security, quality &amp; the client</h3>

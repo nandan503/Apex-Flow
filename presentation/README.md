@@ -7,13 +7,31 @@ plus measurements taken by running the application.
 presentation/
 ├── index.html   # 18 slides — content, diagrams, code excerpts, evidence footnotes
 ├── deck.css     # design system (tokens inherited from frontend/css/style.css)
-├── deck.js      # slide engine: fragments, auto-fit, overview, speaker notes
+├── deck.js      # META (your details) + slide engine: fragments, auto-fit, overview, notes
 └── README.md    # this file
 ```
 
 Companion: **[`docs/PRESENTATION-NOTES.md`](../docs/PRESENTATION-NOTES.md)** — 30-second and 2-minute pitches,
 technical decisions, likely questions with answers, honest framing for the weak points, a
 claim → file → line → evidence map, and the commands used to reproduce every measurement.
+
+## 0. Personalise the title slide (30 seconds)
+
+Three fields are placeholders: your name, course/institution, reviewer. Set them once at the top of
+**`deck.js`** (the `META` object, line 10):
+
+```js
+const META = {
+  name:     'Nandan Sharma',
+  course:   'B.Tech CSE · Final-year project · Thapar University',
+  reviewer: 'Prof. <name>',
+};
+```
+
+Anything you leave empty keeps its placeholder text, gets a dashed amber box on the title slide, and the deck shows
+"⚠ 3 placeholders still on this slide" so nobody can present with `<your name>` projected behind them. Filling all
+three makes both disappear. (Equivalently, edit the three `data-fill` spans in `index.html`; the print stylesheet drops
+the warning banner but keeps the amber boxes, so an unpersonalised PDF is still obviously unpersonalised.)
 
 ## Open it
 
