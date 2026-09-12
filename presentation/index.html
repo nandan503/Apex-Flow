@@ -1,0 +1,833 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>APEX FLOW — Technical Project Presentation</title>
+<link rel="stylesheet" href="deck.css">
+</head>
+<body>
+<div id="hint">← → or click to advance · <b>O</b> overview · <b>N</b> speaker notes · <b>A</b> freeze animations · <b>F</b> fullscreen · print for PDF</div>
+<div id="stage-wrap"><div id="stage">
+
+<!-- ══════════════════ 1 · TITLE ══════════════════ -->
+<section class="slide dark active" data-title="Title" data-notes="<b>30-second version:</b> Apex Flow is a full-stack transport &amp; logistics system — Flask REST API, vanilla-JS front end, dual-engine SQL database — that I used as a vehicle for two things beyond CRUD: a documented 15-finding security remediation, and a CI agent that observes my Render deployments and diagnoses failures. I verified every claim in this deck by running the code in a sandbox, not by reading the README.">
+  <div class="grow" style="display:flex;flex-direction:column;justify-content:center">
+    <div class="eyebrow">Technical project presentation · academic defence</div>
+    <h1 class="wordmark rise" style="--d:.05s">APEX <span class="x">FLOW</span></h1>
+    <p class="tagline rise" style="--d:.16s">Smart Transport &amp; Logistics System — a Flask REST API, a framework-free web client,<br>
+       and a self-diagnosing deployment pipeline.</p>
+    <div class="row rise" style="margin-top:26px;--d:.28s">
+      <span class="chip">Flask 2.3+</span><span class="chip">Vanilla JS</span><span class="chip">SQLite · PostgreSQL</span>
+      <span class="chip">GitHub Actions</span><span class="chip">Render</span>
+    </div>
+    <div class="meta rise" style="--d:.4s">
+      <div><div class="m1">Repository</div><div class="m2 mono">nandan503/Apex-Flow</div></div>
+      <div><div class="m1">Student</div><div class="m2">&lt;your name&gt;</div></div>
+      <div><div class="m1">Course · Institution</div><div class="m2">&lt;fill in&gt;</div></div>
+      <div><div class="m1">Reviewer</div><div class="m2">&lt;professor&gt;</div></div>
+    </div>
+  </div>
+  <div class="evidence">
+    <span>Every technical claim in these slides was checked against the repository, and the runtime behaviour was
+    <b>measured against a live instance</b> (12 Sep 2026).</span>
+    <span class="k2">1,914</span><span class="small">backend LOC</span>
+    <span class="k2">26</span><span class="small">API endpoints</span>
+    <span class="k2">12</span><span class="small">tables</span>
+    <span class="k2">15</span><span class="small">UI pages</span>
+  </div>
+</section>
+
+<!-- ══════════════════ 2 · PROBLEM ══════════════════ -->
+<section class="slide" data-title="Problem &amp; Motivation" data-notes="Be honest here: the repository contains no user research or market analysis. The problem statement is derived from the module set and the RBAC roles, and the motivation is engineering-led. Say that plainly — a professor rewards it more than an invented startup story.">
+  <div class="eyebrow">01 · Problem &amp; motivation</div>
+  <h2>Logistics operations are usually spread across a spreadsheet,<br>a phone call, and someone's memory</h2>
+  <p class="lede">The repository's module set defines the pain it targets: a shipment needs a <b>vehicle</b>, a <b>driver</b>, a
+  <b>route</b>, a <b>proof of delivery</b>, an <b>invoice</b>, and a <b>status trail</b> — and those five artefacts normally live in five different places.</p>
+  <div class="grid cols-4 grow">
+    <div class="card frag"><div class="num">PROBLEM 1</div><h3><span class="ic navy">⌛</span>No shared status</h3>
+      <p>“Where is my consignment?” is answered by calling the driver. The repo models this as an append-only
+      <span class="mono">shipment_status_history</span> table instead.</p></div>
+    <div class="card frag"><div class="num">PROBLEM 2</div><h3><span class="ic navy">✍️</span>No proof of delivery</h3>
+      <p>Deliveries get disputed. The system gates the <b>Delivered</b> state behind a one-time code bound to the shipment,
+      plus the receiver's name.</p></div>
+    <div class="card frag"><div class="num">PROBLEM 3</div><h3><span class="ic navy">🗂️</span>Fleet compliance drifts</h3>
+      <p>Insurance, permit, fitness and service dates are per-vehicle columns
+      (<span class="mono">insurance_expiry</span>, <span class="mono">fitness_expiry</span>) so they can be queried at all.</p></div>
+    <div class="card frag warn"><div class="num">PROBLEM 4</div><h3><span class="ic warn">🔓</span>“Student project” security</h3>
+      <p>The interesting problem for this project: CRUD demos usually ship with open endpoints, <span class="mono">SELECT *</span>,
+      weak OTPs and hardcoded secrets. The audit report attacks exactly that.</p></div>
+  </div>
+  <div class="grid cols-3" style="margin-top:16px">
+    <div class="card accent frag"><h3>Why it is worth solving</h3>
+      <p>The domain forces real engineering: multi-role authorisation, state machines, financial fields that must not be
+      client-controlled, and time-based telemetry.</p></div>
+    <div class="card accent frag"><h3>Why I built it (as evidenced)</h3>
+      <p>The repo is dominated by <b>quality machinery</b>: 15-finding security audit, custom SAST rules, a full CI
+      pipeline, IaC and an ops agent — <b>3,791 lines</b> of docs (2,120), scripts (1,121) and workflow YAML (550)
+        against <b>1,914</b> lines of API code (the client adds a further 4,327). Whatever the intent, the result is a repo where the evidence about the code is half the size of the code itself.</p></div>
+    <div class="card frag"><h3>Who uses it</h3>
+      <p>Four roles declared in the schema <span class="mono">CHECK</span>: ADMIN, MANAGER, DRIVER, CUSTOMER — with different
+      visibility per endpoint.</p></div>
+  </div>
+  <div class="evidence"><span>Derived from</span><span class="k2">backend/database.py · schema</span>
+    <span class="k2">docs/SECURITY_AUDIT.md</span><span class="k2">README.md · Overview</span>
+    <span class="tag part">No user interviews or market research exist in the repo — the motivation is engineering-led, not customer-led.</span></div>
+</section>
+
+<!-- ══════════════════ 3 · OVERVIEW ══════════════════ -->
+<section class="slide" data-title="Project Overview" data-notes="Walk the four boxes left to right in one breath: a person picks a role, the browser calls a JSON API, the service layer turns a request into four coherent writes, and the outputs are a KPI dashboard, live telemetry and an OTP-gated delivery event. Do not oversell: the telemetry at the end of this chain is simulated.">
+  <div class="band"></div>
+  <div class="eyebrow">02 · Project overview</div>
+  <h2>One request path, five writes per booking</h2>
+  <p class="lede">APEX FLOW is a single-origin web application: Flask serves the static client <i>and</i> the JSON API under
+  <span class="mono">/api</span>, so there is no cross-origin hop in production.</p>
+  <div class="flow grow frag" style="align-items:stretch">
+    <div class="node hero stacknode"><div class="t">👤 USER</div>
+      <div class="d">One of four roles signs in. The session holds only <span class="mono">user_id</span> and <span class="mono">role</span>.</div>
+      <div class="m">login.html · auth.js</div></div>
+    <div class="arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M4 12h14m-5-6 6 6-6 6"/></svg></div>
+    <div class="node stacknode"><div class="t">🖥️ SYSTEM</div>
+      <div class="d">15 static pages, 14 JS modules. Every call goes through one helper, <span class="mono">fetchAPI()</span>, with
+      cookie credentials and one toast for errors.</div>
+      <div class="m">frontend/js/app.js</div></div>
+    <div class="arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M4 12h14m-5-6 6 6-6 6"/></svg></div>
+    <div class="node stacknode"><div class="t">⚙️ PROCESSING</div>
+      <div class="d">Blueprint routes → <span class="mono">@login_required</span>/<span class="mono">@require_role</span> → service layer,
+      which fans one booking out into <b>5 INSERTs and one <span class="mono">commit()</span></b>: shipment, status history,
+delivery+OTP, invoice, notification.</div>
+      <div class="m">routes.py → services.py</div></div>
+    <div class="arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M4 12h14m-5-6 6 6-6 6"/></svg></div>
+    <div class="node stacknode"><div class="t">📤 OUTPUT</div>
+      <div class="d">Dashboard KPIs, live map telemetry, OTP confirmation, invoices/CSV-JSON export.</div>
+      <div class="m">reports.py · tracking.py</div></div>
+  </div>
+  <div class="grid cols-4" style="margin-top:16px">
+    <div class="card frag"><h3>Single JSON envelope</h3><p>Every endpoint returns
+      <span class="mono">{success, message, data}</span> from one helper — so the client has one error path.</p></div>
+    <div class="card frag"><h3>Server owns the money</h3><p>Status, payment status and cost are set in the service layer, never read from the body.</p></div>
+    <div class="card frag"><h3>Delivery is an event</h3><p>OTP verification writes history, flips the delivery, and marks the invoice <span class="mono">Paid</span>.</p></div>
+    <div class="card frag warn"><h3>Honest scope limit</h3><p>GPS “live tracking” is an interpolation simulation, and no external map, SMS or payment provider is integrated.</p></div>
+  </div>
+  <div class="evidence"><span class="k2">backend/app.py · serve_static + api_bp</span><span class="k2">backend/services.py · create_shipment()</span>
+    <span class="k2">backend/utils.py · json_response()</span></div>
+</section>
+<!-- ══════════════════ 4 · ARCHITECTURE ══════════════════ -->
+<section class="slide" data-title="System Architecture" data-notes="Reveal one layer at a time. Say what is real: five layers in one process — there is no separate API server, no cache, no queue, no worker. The only external service is Render's API, called by CI (never by the app). Point at the red dashed arrow: the observer reads the same log stream the logger writes, which is the closed loop of the ops automation.">
+  <div class="eyebrow">03 · System architecture</div>
+  <h2>Five layers, one process — and one side-channel to CI</h2>
+  <div class="grid frag" style="grid-template-columns:1.62fr 1fr;flex:1;min-height:0;gap:18px">
+    <div class="flow v" style="gap:9px">
+      <div class="node hero frag" style="display:flex;justify-content:space-between;align-items:center;gap:14px">
+        <div><div class="t">① Client — browser, no framework</div>
+          <div class="d">15 HTML pages · 14 JS modules · 5 CSS files · <span class="mono">fetchAPI()</span> + <span class="mono">&lt;canvas&gt;</span> map · CSS media queries for mobile</div></div>
+        <span class="chip v">frontend/</span></div>
+      <div class="arrow frag"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 4v14m-6-5 6 6 6-6"/></svg></div>
+      <div class="node frag" style="display:flex;justify-content:space-between;align-items:center;gap:14px">
+        <div><div class="t">② HTTP edge — same Flask app, same origin</div>
+          <div class="d">CORS allowlist · default rate limit 200/min · session cookies <span class="mono">HttpOnly · SameSite=Lax · Secure</span> · gunicorn via Procfile</div></div>
+        <span class="chip v">backend/app.py</span></div>
+      <div class="arrow frag"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 4v14m-6-5 6 6 6-6"/></svg></div>
+      <div class="node frag" style="display:flex;justify-content:space-between;align-items:center;gap:14px">
+        <div><div class="t">③ API layer — one Blueprint, 26 routes</div>
+          <div class="d">Auth / shipments / vehicles / drivers / customers / warehouses / routes / tracking / deliveries / payments / reports / notifications</div></div>
+        <span class="chip v">backend/routes.py + auth.py</span></div>
+      <div class="arrow frag"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 4v14m-6-5 6 6 6-6"/></svg></div>
+      <div class="node frag" style="display:flex;justify-content:space-between;align-items:center;gap:14px">
+        <div><div class="t">④ Domain services — where the rules live</div>
+          <div class="d"><span class="mono">services.py</span> (526 lines: shipment, OTP, cascade) · <span class="mono">tracking.py</span> (telemetry) · <span class="mono">reports.py</span> (KPI SQL)</div></div>
+        <span class="chip v">backend/services.py</span></div>
+      <div class="arrow frag"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 4v14m-6-5 6 6 6-6"/></svg></div>
+      <div class="node frag" style="display:flex;justify-content:space-between;align-items:center;gap:14px">
+        <div><div class="t">⑤ Data — dual engine behind one wrapper</div>
+          <div class="d" style="margin-top:2px">12 tables · <span class="mono">PRAGMA foreign_keys = ON</span> · SQLite file in dev, PostgreSQL when <span class="mono">DATABASE_URL</span> is set</div></div>
+        <span class="chip v">backend/database.py</span></div>
+    </div>
+
+    <div class="stack" style="min-height:0">
+      <div class="card frag"><h3><span class="ic">↩︎</span>Return path</h3>
+        <p>Every response is the same envelope, serialised by one helper; DB rows become dicts through
+        <span class="mono">row_to_dict()</span> so SQLite and psycopg2 rows look identical to the client.</p></div>
+      <div class="card info frag"><h3><span class="ic info">◇</span>Observability side-channel</h3>
+        <p><span class="mono">logger.py</span> emits one structured JSON line per security event to stdout →
+        captured by the platform's log pipeline. No APM, no metrics, no log file rotation in-repo.</p></div>
+      <div class="card frag"><h3><span class="ic navy">⎈</span>External services</h3>
+        <p><b>One only:</b> Render's REST API — and it is called by <b>GitHub Actions</b>, never by the app.
+        Read-only, GET only, no secret-returning endpoints.</p></div>
+      <div class="card bad frag"><h3><span class="ic bad">✂︎</span>What is deliberately absent</h3>
+        <p>No ORM · no JS framework or bundler · no Redis (optional, for limiter storage only) · no queue/worker ·
+        no cache · no message broker · no email/SMS provider · no map tile provider.</p></div>
+      <div style="border:1.5px dashed rgba(239,51,72,.45);border-radius:14px;padding:11px 14px;background:rgba(239,51,72,.05)" class="frag">
+        <div style="font-size:12.4px;font-weight:730;color:var(--bad);letter-spacing:.02em">CI → deployment feedback loop</div>
+        <div style="font-size:12.3px;color:var(--muted);line-height:1.45;margin-top:4px">
+        <span class="mono">render-observe.yml</span> reads Render logs for the pushed commit, classifies the failure, and
+        opens an issue or a PR — see slide 11.</div>
+        <svg viewBox="0 0 300 26" style="width:100%;height:22px;margin-top:4px">
+          <path class="dash" d="M8 18 C 90 2, 200 2, 292 14" fill="none" stroke="#ef3348" stroke-width="1.8"/>
+          <path d="M282 9 l12 5 -12 6z" fill="#ef3348"/></svg></div>
+    </div>
+  </div>
+  <div class="evidence"><span>Layer map verified against</span><span class="k2">backend/app.py</span><span class="k2">backend/routes.py · api_bp</span>
+    <span class="k2">backend/database.py · get_db_connection()</span><span class="k2">Procfile · render.yaml</span>
+    <span class="k2">.github/workflows/render-observe.yml</span></div>
+</section>
+
+<!-- ══════════════════ 5 · TECH STACK ══════════════════ -->
+<section class="slide" data-title="Technology Stack" data-notes="For each item, give the reason visible in the code, not the generic reason. Flask: because 26 routes and a session are all that was needed, and it also serves the static client. Vanilla JS: zero build step, so the repo can be served by any static host. secrets module: it is the only correct way to make an OTP. Gunicorn: Render's Procfile. psycopg2: optional, behind a runtime branch. dotenv: config.py imports it inside try/except so the app still boots without it.">
+  <div class="eyebrow">04 · Technology stack</div>
+  <h2>Eight runtime dependencies, and a reason visible in the code for each</h2>
+  <div class="grid grow" style="grid-template-columns:repeat(3,1fr);gap:15px;align-content:start">
+    <div class="card frag"><h3>Frontend</h3>
+      <div class="chips" style="margin:6px 0 9px"><span class="chip">HTML5</span><span class="chip">CSS3 · custom props</span><span class="chip">Vanilla JS</span><span class="chip">&lt;canvas&gt; 2D</span></div>
+      <p><b>Why:</b> no bundler, no framework — the same Flask process serves <span class="mono">static_folder='frontend'</span>,
+      so the whole app is one deployable unit. Charts and the map are hand-drawn on <span class="mono">canvas</span> rather than
+      pulling in a charting or tile library. Responsive behaviour is media queries + a drawer, not a component library.</p></div>
+    <div class="card frag"><h3>Backend</h3>
+      <div class="chips" style="margin:6px 0 9px"><span class="chip">Flask ≥2.3,&lt;4</span><span class="chip">Blueprint</span><span class="chip">Werkzeug</span><span class="chip">flask-cors</span><span class="chip">flask-limiter + limits</span><span class="chip">python-dotenv</span></div>
+      <p><b>Why:</b> 26 JSON routes need routing, sessions and decorators — nothing more. <span class="mono">flask-limiter</span>
+      buys the rate-limit requirement without hand-rolling a token bucket; <span class="mono">limits</span> is its storage
+      backend. Werkzeug provides <span class="mono">generate_password_hash / check_password_hash</span>, so no extra crypto
+      dependency is needed. dotenv is imported in a <span class="mono">try/except ImportError</span> so the app still boots without it.</p></div>
+    <div class="card frag"><h3>Data</h3>
+      <div class="chips" style="margin:6px 0 9px"><span class="chip">sqlite3 (stdlib)</span><span class="chip">PostgreSQL via psycopg2-binary</span><span class="chip">Raw SQL + CHECK constraints</span></div>
+      <p><b>Why:</b> zero-config persistence in dev, real RDBMS in prod, behind one
+      <span class="mono">get_db_connection()</span> switch. No ORM: the queries are short, aggregate-heavy KPI SQL and an ORM
+      would add a layer without removing hand-written SQL. Integrity is enforced in the schema
+      (10-value status enum, FK cascade), so the API cannot corrupt state even if a route forgets to validate.</p></div>
+    <div class="card ok frag"><h3>Security primitives</h3>
+      <div class="chips" style="margin:6px 0 9px"><span class="chip g">secrets.randbelow</span><span class="chip g">uuid4 (IDs)</span><span class="chip g">pbkdf2 hashes</span><span class="chip g">session cookie flags</span></div>
+      <p><b>Why:</b> <span class="mono">secrets</span> is the CSPRNG — replacing <span class="mono">random.randint</span> for OTPs
+      was finding F-04 in the audit. <span class="mono">uuid4().hex[:8]</span> IDs remove enumeration (F-13). Both are stdlib,
+      so no dependency is added to fix a vulnerability.</p></div>
+    <div class="card frag"><h3>Quality &amp; CI</h3>
+      <div class="chips" style="margin:6px 0 9px"><span class="chip">GitHub Actions</span><span class="chip">gitleaks</span><span class="chip">Semgrep (7 custom rules)</span><span class="chip">py_compile</span><span class="chip">pip-audit</span><span class="chip">pre-commit</span><span class="chip">pytest · pytest-cov</span></div>
+      <p><b>Why:</b> cheap static gates (syntax, secrets, SAST) run in &lt;60 s on every PR; pytest is wired but has no
+      test files to run yet (slide 13); pip-audit is informational by design (<span class="mono">|| true</span>) until a clean
+      baseline exists.</p></div>
+    <div class="card frag"><h3>Deployment &amp; scripting</h3>
+      <div class="chips" style="margin:6px 0 9px"><span class="chip">Gunicorn</span><span class="chip">Render (Procfile + render.yaml)</span><span class="chip">systemd/Nginx docs</span><span class="chip">Python stdlib scripts</span></div>
+      <p><b>Why:</b> <span class="mono">web: gunicorn backend.app:app</span> is the whole runtime; <span class="mono">render.yaml</span>
+      keeps infra in git with <span class="mono">sync: false</span> on every secret. The ops scripts use
+      <span class="mono">urllib</span> only — no <span class="mono">requests</span> — so CI needs no extra install step and the
+      app's dependency list stays small.</p></div>
+  </div>
+  <div class="evidence"><span>Counts from</span><span class="k2">requirements.txt · 8 packages</span>
+    <span class="k2">backend/config.py</span><span class="k2">backend/database.py · psycopg2 branch</span>
+    <span class="k2">scripts/render_observe.py · urllib</span>
+    <span class="tag na">Nothing here is inferred from what a package could do — only from import sites in this repo.</span></div>
+</section>
+<!-- ══════════════════ 6 · CODEBASE ARCHITECTURE ══════════════════ -->
+<section class="slide" data-title="Codebase Architecture" data-notes="The point to make: the layering is real and visible in the file list — routes contain no SQL, services contain no HTTP, logger is the only module that formats anything for humans. Also own the imbalance: 1,914 lines of backend against 3,241 lines of ops automation, docs and configuration — and zero lines of tests.">
+  <div class="eyebrow">05 · Codebase architecture</div>
+  <h2>Thin routes, fat services, no SQL in the view layer</h2>
+  <div class="grid grow" style="grid-template-columns:1.02fr 1fr;gap:20px">
+    <div class="code frag" style="align-self:start">
+      <header><span class="dot"></span><span class="path">Apex-Flow/</span><span class="note">LOC per area · Python 1,914 · JS 1,199 · HTML 2,019 · CSS 1,109 · docs+scripts 3,241</span></header>
+      <pre style="font-size:12.1px;line-height:1.72"><span class="l"><span class="p">Apex-Flow/</span></span><span class="l"><span class="p">├──</span> <span class="f">backend/</span>        <span class="c"># 1,914 lines — Flask REST API, 11 modules</span></span><span class="l"><span class="p">│   </span>├── <span class="w">app.py</span>         <span class="c"># 102 · WSGI entry, CORS, limiter, cookies, static</span></span><span class="l"><span class="p">│   </span>├── <span class="w">routes.py</span>      <span class="c"># 379 · Blueprint, 26 handlers over 21 paths, zero business logic</span></span><span class="l"><span class="p">│   </span>├── <span class="w">auth.py</span>        <span class="c">#  94 · @login_required, @require_role, authenticate_user</span></span><span class="l"><span class="p">│   </span>├── <span class="w">services.py</span>    <span class="c"># 526 · shipment/OTP/invoice/notification logic</span></span><span class="l"><span class="p">│   </span>├── <span class="w">database.py</span>    <span class="c"># 459 · schema, seed, SQLite↔Postgres wrapper</span></span><span class="l"><span class="p">│   </span>├── <span class="w">tracking.py</span>    <span class="c">#  96 · time-parameterised position simulation</span></span><span class="l"><span class="p">│   </span>├── <span class="w">reports.py</span>     <span class="c">#  84 · dashboard KPIs, 4 analytics projections</span></span><span class="l"><span class="p">│   </span>├── <span class="w">logger.py</span>      <span class="c"># 106 · structured JSON events, PII redaction</span></span><span class="l"><span class="p">│   </span>└── <span class="w">config/models/utils</span> <span class="c"># 68 · env config, row→dict, response envelope</span></span><span class="l"><span class="p">├──</span> <span class="f">frontend/</span>       <span class="c"># 15 pages · 14 js modules · 5 css · no build step</span></span><span class="l"><span class="p">│   </span>├── <span class="w">js/app.js</span>      <span class="c"># 204 · fetchAPI(), toasts, session bootstrap, drawer</span></span><span class="l"><span class="p">│   </span>├── <span class="w">js/*.js</span>        <span class="c"># one module per page, DOM-only rendering</span></span><span class="l"><span class="p">│   </span>└── <span class="w">css/style.css</span>  <span class="c"># design tokens in :root → deck palette</span></span><span class="l"><span class="p">├──</span> <span class="f">scripts/</span>        <span class="c"># 1,121 · Render observe / sanitize / fix / escalate</span></span><span class="l"><span class="p">├──</span> <span class="f">.github/</span>        <span class="c"># ci.yml ×3 jobs · render-observe.yml ×3 · CODEOWNERS</span></span><span class="l"><span class="p">├──</span> <span class="f">docs/</span>           <span class="c"># API · AUDIT · DEPLOYMENT · CONTRIBUTING · render-agent</span></span><span class="l"><span class="p">└──</span> <span class="f">data/</span>           <span class="c"># 6 seed JSON files — <span class="w">not read by any code path</span></span></span><span class="l"><span class="p">    </span><span class="c">   (seeding lives in database.py:seed_demo_data)</span></span><span class="l"><span class="p">    </span><span class="c">   apexflow.db excluded by .gitignore</span></span></pre>
+    </div>
+    <div class="stack" style="justify-content:flex-start">
+      <div class="card accent frag"><h3>Layer contract, as actually observed</h3>
+        <ul class="bul compact" style="margin-top:4px">
+          <li><b>routes.py</b> — parse body/query, check <span class="mono">request.get_json() or {}</span>, delegate, wrap in envelope. No SQL.</li>
+          <li><b>auth.py</b> — the only place 401 vs 403 is decided; also emits the audit event.</li>
+          <li><b>services.py</b> — owns transactions, ID generation, OTP, money, and the cross-table cascade.</li>
+          <li><b>database.py</b> — owns schema, constraints, seeding, and the driver abstraction.</li>
+          <li><b>logger.py</b> — the only module that formats anything for humans.</li>
+        </ul></div>
+      <div class="grid cols-2 frag">
+        <div class="stat"><div class="v">26</div><div class="l">endpoints / 1 blueprint</div></div>
+        <div class="stat"><div class="v">12</div><div class="l">tables · 5 with FKs</div></div>
+        <div class="stat"><div class="v">14</div><div class="l">frontend JS modules</div></div>
+        <div class="stat bad"><div class="v">0</div><div class="l">automated tests</div></div>
+      </div>
+      <div class="card warn frag"><h3><span class="ic warn">!</span>Structural weaknesses I could see in the layout</h3>
+        <ul class="bul compact" style="margin-top:4px">
+          <li>One module per role, but <b>no</b> <span class="mono">tests/</span> directory — CI runs <span class="mono">pytest</span> only <i>if</i> it exists.</li>
+          <li>Each service call opens and closes its own connection: no pooling, no shared transaction across the 5 writes — a failure mid-way is neither atomic nor cleanly released.</li>
+          <li>Frontend has no client-side router or state store; page modules re-fetch on load and the tracking page polls every 4 s.</li>
+          <li><span class="mono">data/*.json</span> duplicates the seed data in <span class="mono">database.py</span> and can silently diverge.</li>
+        </ul></div>
+    </div>
+  </div>
+  <div class="evidence"><span class="k2">wc -l backend/*.py frontend/js/*.js scripts/*.py</span>
+    <span class="k2">.github/workflows/ci.yml · test-sqlite job</span>
+    <span class="k2">backend/services.py · get_db_connection() per call</span></div>
+</section>
+
+<!-- ══════════════════ 7 · REQUEST LIFECYCLE ══════════════════ -->
+<section class="slide" data-title="How the System Works" data-notes="Trace POST /api/shipments end to end — it is the only flow that touches every layer. Emphasise steps 3 and 5: authorisation is decorator-based and the cost/status fields are re-derived server-side, which is the F-02 fix. Then mention the second flow (PUT /shipments/:id/status) is only 4 steps long, which is why it has no state-machine validation.">
+  <div class="band"></div>
+  <div class="eyebrow">06 · How the system works</div>
+  <h2>Anatomy of one write: <span class="mono" style="font-size:26px">POST /api/shipments</span></h2>
+  <p class="lede">Chosen because it crosses every layer — session, authorisation, validation, four tables, an OTP, an invoice and a log line.</p>
+  <div class="grid grow frag" style="grid-template-columns:1.28fr 1fr;gap:18px">
+    <div class="flow v" style="gap:7px">
+      <div class="node frag"><div class="t"><span class="ic">1</span>Client → <span class="mono">fetchAPI('/shipments', {method:'POST'})</span></div>
+        <div class="d">Form is read field-by-field in <span class="mono">shipments.js</span>; the envelope contract is assumed, not validated.</div></div>
+      <div class="node frag"><div class="t"><span class="ic">2</span>Edge → cookies + limiter</div>
+        <div class="d">Default limit checked (200/min/IP) · <span class="mono">X-RateLimit-*</span> attached · CORS allowlist evaluated.</div></div>
+      <div class="node hero frag"><div class="t"><span class="ic">3</span>Authorise → <span class="mono">@login_required</span></div>
+        <div class="d">Presence of <span class="mono">session['user_id']</span> only — <b>no CSRF token</b>, mitigated by <span class="mono">SameSite=Lax</span>.</div></div>
+      <div class="node frag"><div class="t"><span class="ic">4</span>Validate → hand-written checks</div>
+        <div class="d">Route requires <span class="mono">pickup</span> and <span class="mono">destination</span>; everything else is defaulted or coerced with <span class="mono">float()</span>/<span class="mono">int()</span>.</div></div>
+      <div class="node frag"><div class="t"><span class="ic">5</span>Compute → service layer</div>
+        <div class="d">Allowlist filter · <span class="mono">SHP-xxxxxxxx</span> id · server-set <span class="mono">status='Booked'</span>, <span class="mono">payment_status='Pending'</span> · cost formula · 6-digit CSPRNG OTP with +30 min expiry.</div></div>
+      <div class="node frag"><div class="t"><span class="ic">6</span>Persist → 5 INSERTs, one commit</div>
+        <div class="d"><span class="mono">shipments</span> → <span class="mono">shipment_status_history</span> → <span class="mono">deliveries</span>(OTP) → <span class="mono">payments</span>(18 % GST) → <span class="mono">notifications</span>. <span class="tag part">single transaction, no rollback wrapper</span></div></div>
+      <div class="node frag"><div class="t"><span class="ic">7</span>Respond → 201 + audit log</div>
+        <div class="d"><span class="mono">{success:true, message, data:&lt;shipment&gt;, shipment_id}</span> — read back through a second SELECT; the OTP is never in it.</div></div>
+    </div>
+    <div class="stack">
+      <div class="code frag"><header><span class="dot"></span><span class="path">backend/routes.py · add_shipment()</span></header>
+<pre><span class="l"><span class="at">@api_bp</span>.route(<span class="s">'/shipments'</span>, methods=[<span class="s">'POST'</span>])</span><span class="l"><span class="at">@login_required</span></span><span class="l"><span class="k">def</span> <span class="f">add_shipment</span>():</span><span class="l">    data = request.get_json() <span class="k">or</span> {}</span><span class="l">    pickup = data.get(<span class="s">'pickup_location'</span>) <span class="k">or</span> data.get(<span class="s">'pickup'</span>)</span><span class="l">    destination = data.get(<span class="s">'destination'</span>)</span><span class="l">    <span class="k">if not</span> pickup <span class="k">or not</span> destination:</span><span class="l">        <span class="k">return</span> error_response(<span class="s">'Pickup and destination are required'</span>, <span class="n">400</span>)</span><span class="l">    shipment = create_shipment(data,</span><span class="l">        caller_user_id=session.get(<span class="s">'user_id'</span>),   <span class="c"># identity, not payload</span></span><span class="l">        caller_role=session.get(<span class="s">'role'</span>))</span><span class="l">    <span class="k">return</span> json_response(data=shipment, message=<span class="s">"Shipment created successfully"</span>,</span><span class="l">                         status_code=<span class="n">201</span>)</span></pre></div>
+      <div class="card frag"><h3>Measured on a live instance</h3>
+        <p>Locally, one complete booking (auth + 4 inserts + commit + read-back) finished in <b>10 ms</b>. That is not a
+        benchmark — it shows where the time <i>isn't</i> going: no pool, no cache, no network hop, no queue.</p></div>
+      <div class="card warn frag"><h3>Two shortcuts visible in this path</h3>
+        <p>① The status flow <span class="mono">PUT /shipments/:id/status</span> skips validation entirely — any of the 10 enum
+        values can be set from any state.<br>② If an INSERT raises, the connection is closed only on the success path
+        (slide 14 shows what that costs).</p></div>
+    </div>
+  </div>
+  <div class="evidence"><span class="k2">backend/routes.py · add_shipment</span><span class="k2">backend/services.py · create_shipment</span>
+    <span class="k2">frontend/js/shipments.js · handleCreateShipment</span>
+    <span class="tag ok">Behaviour verified live: 201 response, 4 rows written, 1 OTP, cost re-derived by the server</span></div>
+</section>
+<!-- ══════════════════ 8 · KEY IMPL A ══════════════════ -->
+<section class="slide" data-title="Key Implementation · Authorisation Boundary" data-notes="Two decisions to defend. (1) Authorisation is decorator-based, so protection is a property of the route definition rather than of handler discipline — and the Semgrep rule enforces it on routes.py. (2) Client input is filtered through an explicit field allowlist, and status/payment/cost are then re-derived — the classic mass-assignment fix. If asked 'why not a serialiser library?', answer: the repo chose zero-dependency validation and pays for it with hand-written checks (slide 14 shows the bug that creates).">
+  <div class="eyebrow">07 · Key technical implementation — 1 of 2</div>
+  <h2>Authorisation and the data-integrity boundary</h2>
+  <div class="grid grow" style="grid-template-columns:1fr 1fr;gap:18px">
+    <div class="stack">
+      <div class="code frag"><header><span class="dot"></span><span class="path">backend/auth.py · require_role()</span>
+        <span class="note">25 of 26 routes carry a decorator</span></header>
+<pre><span class="l"><span class="k">def</span> <span class="f">require_role</span>(*roles):</span><span class="l">    <span class="k">def</span> <span class="f">decorator</span>(f):</span><span class="l">        <span class="at">@wraps</span>(f)</span><span class="l">        <span class="k">def</span> <span class="f">decorated</span>(*args, **kwargs):</span><span class="l mark">            <span class="k">if not</span> session.get(<span class="s">'user_id'</span>):</span><span class="l">                log_auth_required(endpoint=..., ip=request.remote_addr)</span><span class="l">                <span class="k">return</span> error_response(<span class="s">'Authentication required'</span>, <span class="n">401</span>)</span><span class="l mark">            <span class="k">if</span> session.get(<span class="s">'role'</span>) <span class="k">not in</span> roles:</span><span class="l">                log_forbidden(user_id=..., role=..., endpoint=...)</span><span class="l">                <span class="k">return</span> error_response(<span class="s">f"Forbidden — requires role: {roles}"</span>, <span class="n">403</span>)</span><span class="l">            <span class="k">return</span> f(*args, **kwargs)</span><span class="l">        <span class="k">return</span> decorated</span><span class="l">    <span class="k">return</span> decorator</span></pre></div>
+      <div class="card frag"><h3>Why this matters</h3>
+        <p>Authorisation is a <b>property of the route definition</b>, not of the handler's discipline: forgetting it is visible in
+        a diff, and a custom Semgrep rule (<span class="mono">apexflow-unauthenticated-route</span>) fails CI when a route in
+        <span class="mono">routes.py</span> has neither decorator. 401 and 403 are distinct, and each is logged with the caller
+        identity — the audit trail and the enforcement are produced by the same function, so they cannot drift apart.</p></div>
+    </div>
+    <div class="stack">
+      <div class="code frag"><header><span class="dot"></span><span class="path">backend/services.py · create_shipment()</span>
+        <span class="note">F-02 mass-assignment fix</span></header>
+<pre><span class="l"><span class="w">_SHIPMENT_ALLOWED_FIELDS</span> = {</span><span class="l">    <span class="s">'customer_name'</span>, <span class="s">'pickup_location'</span>, <span class="s">'destination'</span>, <span class="s">'goods_type'</span>,</span><span class="l">    <span class="s">'description'</span>, <span class="s">'weight_kg'</span>, <span class="s">'quantity'</span>, <span class="s">'payment_method'</span>, ... }</span><span class="l"></span><span class="l mark">safe = {k: v <span class="k">for</span> k, v <span class="k">in</span> data.items() <span class="k">if</span> k <span class="k">in</span> _SHIPMENT_ALLOWED_FIELDS}</span><span class="l"></span><span class="l"><span class="c"># fields the client can never set</span></span><span class="l mark">status, payment_status = <span class="s">'Booked'</span>, <span class="s">'Pending'</span></span><span class="l mark">shipping_cost = _calculate_shipping_cost(weight_kg, pickup, destination)</span><span class="l">customer_id = caller_user_id <span class="k">if</span> caller_role == <span class="s">'CUSTOMER'</span> \</span><span class="l markw">              <span class="k">else</span> data.get(<span class="s">'customer_id'</span>, <span class="s">'CUST001'</span>)   <span class="c"># ⚠ not safe.get</span></span><span class="l"></span><span class="l"><span class="c"># response is re-read from the DB, so what the client sees is</span></span><span class="l"><span class="c"># what was actually stored — not what it asked for</span></span><span class="l"><span class="k">return</span> get_shipment_by_id(shipment_id)</span></pre></div>
+      <div class="card ok frag"><h3><span class="ic ok">✓</span>Verified live, not just read</h3>
+        <p>Posting <span class="mono">{"status":"Delivered","payment_status":"Paid","shipping_cost":1}</span> returned
+        <span class="mono">201</span> with <span class="mono">status:"Booked"</span>, <span class="mono">payment_status:"Pending"</span>,
+        <span class="mono">shipping_cost:3169.0</span> — the injected fields were dropped.</p></div>
+      <div class="card bad frag"><h3><span class="ic bad">✗</span>…and the one place it leaks</h3>
+        <p><span class="mono">customer_id</span> is read from the raw body, not from <span class="mono">safe</span>. It is not
+        <i>validated</i> — an unknown id dies on the FK constraint with a 500 (no injection), but a valid id lets one customer's
+        booking be recorded against another's account. <b>Fixed by:</b> one word, <span class="mono">data.get</span> →
+        <span class="mono">safe.get</span>, plus adding the field to the allowlist with a membership check.</p></div>
+    </div>
+  </div>
+  <div class="evidence"><span class="k2">backend/auth.py · login_required / require_role</span><span class="k2">backend/services.py · create_shipment</span>
+    <span class="k2">.semgrep.yml · apexflow-unauthenticated-route</span><span class="k2">docs/SECURITY_AUDIT.md · F-01, F-02, F-09</span></div>
+</section>
+
+<!-- ══════════════════ 9 · KEY IMPL B — OTP ══════════════════ -->
+<section class="slide" data-title="Key Implementation · OTP Proof of Delivery" data-notes="This is the most complete feature in the repo: generation, storage, transport-invisible, verification, brute-force limits, expiry, and a cross-table cascade. Walk the four boxes, then the code, then read the measured output verbatim. If asked 'how does the customer learn the OTP?', answer honestly: there is no delivery channel — in this build the code is shown to the ops staff on the Deliveries page, which is why the API must not return it.">
+  <div class="band"></div>
+  <div class="eyebrow">08 · Key technical implementation — 2 of 2</div>
+  <h2>Proof of delivery: an OTP that is generated, constrained and never returned</h2>
+  <div class="flow frag" style="margin-bottom:14px">
+    <div class="node"><div class="t">Generate</div><div class="d">On booking — <span class="mono">secrets.randbelow(900000)+100000</span>, so 900 000 keyspace, not 10 000.</div>
+      <div class="m">services.py · _generate_otp()</div></div>
+    <div class="arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M4 12h14m-5-6 6 6-6 6"/></svg></div>
+    <div class="node"><div class="t">Store &amp; bind</div><div class="d"><span class="mono">deliveries</span> row keyed by <span class="mono">shipment_id UNIQUE</span>, with <span class="mono">otp_attempts=0</span> and a +30 min deadline.</div>
+      <div class="m">database.py · deliveries</div></div>
+    <div class="arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M4 12h14m-5-6 6 6-6 6"/></svg></div>
+    <div class="node hero"><div class="t">Verify</div><div class="d">Lockout → expiry → equality, in that order; each failure persists the counter before responding.</div>
+      <div class="m">services.py · confirm_delivery()</div></div>
+    <div class="arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M4 12h14m-5-6 6 6-6 6"/></svg></div>
+    <div class="node"><div class="t">Cascade</div><div class="d">Shipment → <span class="mono">Delivered</span>, delivery → <span class="mono">Delivered</span> + timestamp, invoice → <span class="mono">Paid</span>, history appended.</div>
+      <div class="m">update_shipment_status()</div></div>
+  </div>
+  <div class="grid grow" style="grid-template-columns:1.15fr 1fr;gap:18px">
+    <div class="code frag"><header><span class="dot"></span><span class="path">backend/services.py · confirm_delivery()</span>
+      <span class="note">order of checks is deliberate</span></header>
+<pre><span class="l"><span class="k">if</span> attempt_count &gt;= OTP_MAX_ATTEMPTS:        <span class="c"># lockout is checked FIRST</span></span><span class="l">    log_otp_locked(shipment_id=..., ip=ip)</span><span class="l">    <span class="k">return</span> False, <span class="s">"OTP locked after too many failed attempts."</span></span><span class="l"></span><span class="l"><span class="k">if</span> datetime.now() &gt; expires_at:              <span class="c"># then the 30-min TTL</span></span><span class="l">    <span class="k">return</span> False, <span class="s">"OTP has expired. Please request a new one."</span></span><span class="l"></span><span class="l"><span class="k">if</span> d[<span class="s">'otp_code'</span>] != <span class="f">str</span>(otp_entered).strip():</span><span class="l mark">    new_attempt = attempt_count + <span class="n">1</span></span><span class="l mark">    cursor.execute(<span class="s">"UPDATE deliveries SET otp_attempts = ?"</span>,</span><span class="l">    conn.commit(); log_otp_attempt(success=<span class="n">False</span>, attempt_count=new_attempt)</span><span class="l">    <span class="k">return</span> False, <span class="s">f"Invalid OTP Code. {remaining} attempt(s) remaining."</span></span><span class="l"></span><span class="l">update_shipment_status(shipment_id, <span class="s">'Delivered'</span>, updated_by=<span class="s">"Driver"</span>, ...)</span><span class="l"><span class="k">return</span> True, <span class="s">"Delivery confirmed successfully!"</span></span></pre></div>
+    <div class="stack">
+      <div class="card ok frag"><h3><span class="ic ok">✓</span>Measured against the live API</h3>
+        <div class="mono" style="font-size:11.9px;line-height:1.75;color:var(--navy);background:#f6fbf8;border:1px solid rgba(8,167,90,.24);border-radius:9px;padding:9px 11px;margin-top:6px">
+400 Invalid OTP Code. 4 attempt(s) remaining.<br>400 Invalid OTP Code. 3 attempt(s) remaining.<br>
+400 Invalid OTP Code. 2 attempt(s) remaining.<br>400 Invalid OTP Code. 1 attempt(s) remaining.<br>
+400 OTP locked after too many failed attempts.<br>
+<span style="color:var(--ok)"><b>200</b> Delivery confirmed successfully!</span> &nbsp;<span class="small">(on a fresh shipment)</span></div>
+        <p style="margin-top:7px">After lockout, the <b>correct</b> code is also refused — the counter, not the code, decides. And
+        <span class="mono">GET /api/deliveries</span> returns 12 columns with <b>no</b> <span class="mono">otp_*</span> among them.</p></div>
+      <div class="card warn frag"><h3><span class="ic warn">⚖</span>Trade-offs I accept in this design</h3>
+        <ul class="bul compact" style="margin-top:4px">
+          <li><b>Plaintext at rest.</b> Hashing is cheap here (compare <span class="mono">sha256(input)</span>), so plaintext is a choice, not a
+            constraint: it lets an operator read the code back to a driver — which is also why the UI still tries to render it.
+            A hash column plus a reveal-once endpoint would keep the workflow without the table-wide exposure.</li>
+          <li>Comparison is not constant-time (<span class="mono">!=</span> on short digit strings); the 5-attempt lockout is what actually bounds the attack.</li>
+          <li>No re-issue endpoint. After the TTL there is no way to get a new code except by editing the DB.</li>
+          <li>Lockout is per shipment, not per account — cheap to bypass by switching shipments, but it cannot lock a receiver out of the platform.</li>
+        </ul></div>
+    </div>
+  </div>
+  <div class="evidence"><span class="k2">backend/services.py · _generate_otp / confirm_delivery</span>
+    <span class="k2">backend/database.py · deliveries(otp_code, otp_attempts, otp_expires_at)</span>
+    <span class="k2">docs/SECURITY_AUDIT.md · F-04, F-05, F-14</span>
+    <span class="tag part">No SMS/email transport — the code is surfaced by the UI, not sent to the receiver</span></div>
+</section>
+
+<!-- ══════════════════ 10 · ALGORITHMS &amp; DOMAIN LOGIC ══════════════════ -->
+<section class="slide" data-title="Algorithms &amp; Domain Logic" data-notes="Four pieces of logic, and I label which are real. (1) The lifecycle: legal values are enforced by a SQL CHECK, but there is no transition table — I measured Delivered → Booked returning 200. (2) Pricing: real formula, but hash() is salted per process, so the invoice is not reproducible — 7 runs, ₹21 845 to ₹23 042. (3) Tracking: a clock-driven interpolation, proven by 10 % → 14 % in 4 s across all trucks. (4) Route 'optimisation': a table lookup then a string-length heuristic, 430 km for Ludhiana → Chennai. Say 'simulation' out loud for 3 and 4; do not let the audience discover it.">
+  <div class="eyebrow">09 · Algorithms &amp; domain logic</div>
+  <h2>Four algorithms — two real, two deliberately heuristic</h2>
+  <div class="grid grow" style="grid-template-columns:1fr 1fr">
+    <div class="card frag" style="display:flex;flex-direction:column">
+      <h3><span class="ic navy">⇄</span>Shipment lifecycle — constraints, not transitions</h3>
+      <div class="chain" style="margin-top:9px"><span>Booked</span><i>→</i><span>Confirmed</span><i>→</i><span>Picked Up</span><i>→</i><span>At Warehouse</span><i>→</i><span>In Transit</span><i>→</i><span>Out for Delivery</span><i>→</i><span>Delivered</span></div>
+      <div class="small" style="margin-top:6px">exception states: <span class="mono">Delayed</span> <span class="mono">Cancelled</span> <span class="mono">Returned</span> — the 10 values of the schema's
+        <span class="mono">CHECK(status IN …)</span></div>
+      <p style="margin-top:8px">Legal values are declared in <b>SQL</b>, so both engines and both clients obey one definition. I verified an invalid value
+        fails closed: <span class="mono">PUT {"status":"Teleported"}</span> → <span class="mono">IntegrityError: CHECK constraint failed</span>.</p>
+      <p style="margin-top:6px"><b>No edge validation:</b> <span class="mono">update_shipment_status()</span> never reads the current value, so any state may
+        follow any state. Live check: <span class="mono">Delivered → Booked</span> returned <b>200</b> — the column was moved backwards with no complaint.</p>
+      <p style="margin-top:6px">Every accepted transition appends an immutable history row with <span class="mono">location</span>,
+        <span class="mono">updated_by</span> (from session, F-08) and <span class="mono">notes</span> — that table, not the status column, is the audit record.
+        The missing piece is ~15 lines: a dict of allowed successors, checked before the UPDATE.</p>
+    </div>
+    <div class="card frag" style="display:flex;flex-direction:column">
+      <h3><span class="ic navy">₹</span>Pricing — deterministic formula, non-deterministic result</h3>
+      <div class="code" style="margin:9px 0"><header><span class="dot"></span><span class="path">backend/services.py · _calculate_shipping_cost()</span></header>
+<pre><span class="l">base = <span class="n">1500.0</span> ; per_kg = weight_kg * <span class="n">2.5</span></span><span class="l mark">distance_factor = <span class="f">abs</span>(<span class="f">hash</span>(pickup + destination)) % <span class="n">3000</span> + <span class="n">500</span>  <span class="c"># ⚠ salted</span></span><span class="l"><span class="k">return</span> <span class="f">round</span>(base + per_kg + distance_factor * <span class="n">0.5</span>, <span class="n">2</span>)</span></pre></div>
+      <p><b>What I measured:</b> the same shipment (Ludhiana → Delhi, 8 000 kg), priced in seven independent processes, came out between
+      <b>₹21 845 and ₹23 042</b>. Python salted <span class="mono">str</span> hashing with <span class="mono">PYTHONHASHSEED</span>, so
+      <span class="mono">hash()</span> is only stable inside one process.</p>
+      <p style="margin-top:7px">And it is not a distance — it is a pseudo-random number derived from the letters of two city names, so a restart
+      changes the price of an identical booking. Fix: the <span class="mono">routes</span> table already holds real distances; use them,
+      or <span class="mono">zlib.crc32</span> for a stable pseudo-distance.</p>
+    <div class="card frag" style="display:flex;flex-direction:column">
+      <h3><span class="ic navy">🛰</span>“Live” tracking — a clock, not a GPS feed</h3>
+      <div class="code" style="margin:9px 0"><header><span class="dot"></span><span class="path">backend/tracking.py · get_live_tracking_data()</span></header>
+<pre><span class="l mark">t = (<span class="f">int</span>(time.time()) % <span class="n">100</span>) / <span class="n">100.0</span>          <span class="c"># 0 → 1, every 100 s</span></span><span class="l">lat = start[<span class="n">0</span>] + (end[<span class="n">0</span>] - start[<span class="n">0</span>]) * current_time_factor</span><span class="l">dist_remaining = haversine_approx * (<span class="n">1.0</span> - current_time_factor)</span><span class="l">speed = <span class="n">58</span> + <span class="f">int</span>(math.sin(time.time()) * <span class="n">12</span>)                <span class="c"># 46–70 km/h</span></span><span class="l">eta_minutes = <span class="f">int</span>((dist_remaining / <span class="f">max</span>(speed, <span class="n">30</span>)) * <span class="n">60</span>)</span></pre></div>
+      <ul class="bul compact">
+        <li><b>Verified:</b> progress went <span class="mono">10 % → 14 %</span> in 4 s while the front-end polled every 4 s, and all three
+        active shipments shared one factor — trucks move in lockstep, and rewind when the 100 s window wraps.</li>
+        <li>Distance uses <span class="mono">√(Δlat²+Δlng²)×111</span> — a flat-earth approximation, fine for a demo, wrong across
+        India's latitude span.</li>
+        <li>With no in-transit shipment the module returns a <b>hardcoded</b> SHP001 record, so the UI always looks alive.</li>
+      </ul>
+      <div class="small" style="margin-top:auto;padding-top:9px">A real feed needs a device ingest endpoint + a position table; the current shape already supports that swap.</div>
+    </div>
+    <div class="card frag" style="display:flex;flex-direction:column">
+      <h3><span class="ic navy">🧭</span>Route “optimisation” — cache-then-heuristic</h3>
+      <div class="code" style="margin:9px 0"><header><span class="dot"></span><span class="path">backend/routes.py · optimize_route()</span></header>
+<pre><span class="l">cursor.execute(<span class="s">"SELECT * FROM routes"</span></span><span class="l">    <span class="s">WHERE LOWER(pickup)=LOWER(?) AND LOWER(dest)=LOWER(?)"</span>)</span><span class="l"><span class="k">if</span> found: <span class="k">return</span> json_response(data=found)          <span class="c"># cached real answer</span></span><span class="l markw">dist = <span class="n">250</span> + (<span class="f">len</span>(pickup) + <span class="f">len</span>(destination)) * <span class="n">12</span>   <span class="c"># ⚠ heuristic</span></span><span class="l">time_hrs = <span class="f">round</span>(dist / <span class="n">65.0</span>, <span class="n">1</span>); fuel_cost = <span class="f">int</span>(dist * <span class="n">8.6</span>)</span><span class="l">stops = [toll_plaza, rest_stop, destination_hub]   <span class="c"># names generated</span></span></pre></div>
+      <ul class="compact bul">
+        <li><b>Measured:</b> Ludhiana → Chennai returns <b>430 km</b> (real ≈ 2 400 km), and “Ludhiana → <b>Che</b>” returns
+        <b>382 km</b> — the distance is literally a function of the string lengths.</li>
+        <li>Four seeded corridors (Delhi–Jaipur 286 km …) are honest data; anything unsaved is fabricated, including the stops.</li>
+        <li>No algorithm here is a solver: no graph, no nearest-neighbour, no OR-Tools. Naming it <i>optimize</i> oversells it.</li>
+      </ul>
+      <div class="small" style="margin-top:auto;padding-top:9px">Honest framing for the report: “route lookup with a distance-cost estimate”, and a TODO for OSRM/Valhalla.</div>
+    </div>
+  </div>
+  <div class="evidence"><span class="k2">backend/database.py · shipments CHECK(status IN …)</span><span class="k2">backend/services.py · update_shipment_status</span>
+    <span class="k2">backend/tracking.py</span><span class="k2">backend/database.py · 4 seeded route rows (data/routes.json holds 2 and is read by nothing)</span>
+    <span class="tag no">Reproduced defects ①–③ are mine to fix, not the framework's</span></div>
+  </div>
+</section>
+<!-- ══════════════════ 11 · OPS AUTOMATION ══════════════════ -->
+<section class="slide" data-title="Self-Diagnosing Deployment" data-notes="This is the part of the repo that is not a CRUD app: 1,121 lines of stdlib-only Python that read a deployment's logs and classify them. Present it as an experiment in bounded automation. Be explicit that the 'fix' stage currently only classifies and reports — I verified no code path mutates a file, so the PR branch never triggers. The escalation half does work.">
+  <div class="band"></div>
+  <div class="eyebrow">10 · Beyond the app: self-diagnosing deployment</div>
+  <h2>1,121 lines of ops automation that bound themselves <span class="small" style="font-weight:600">— stdlib only, no <span class="mono">requests</span>, no LLM</span></h2>
+  <div class="flow frag" style="margin:2px 0 14px">
+    <div class="node"><div class="t">push → main</div><div class="d"><span class="mono">render-observe.yml</span> starts per SHA; <span class="mono">concurrency</span> group serialises runs.</div></div>
+    <div class="arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M4 12h14m-5-6 6 6-6 6"/></svg></div>
+    <div class="node"><div class="t">Discover service</div><div class="d">Env var <span class="mono">RENDER_SERVICE_ID</span>, else paginated <span class="mono">GET /v1/services</span> matched on repo URL (ambiguous → exit 5).</div>
+      <div class="m">render_observe.py</div></div>
+    <div class="arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M4 12h14m-5-6 6 6-6 6"/></svg></div>
+    <div class="node"><div class="t">Match &amp; poll deploy</div><div class="d">Polls until terminal, matching by commit SHA — so it observes <i>my</i> deploy, not someone else's.</div></div>
+    <div class="arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M4 12h14m-5-6 6 6-6 6"/></svg></div>
+    <div class="node hero"><div class="t">Classify + redact</div><div class="d">21 log fragments → 12 (category, subcategory) signatures across 4 categories; every byte passes the sanitizer before it is written.</div></div>
+    <div class="arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M4 12h14m-5-6 6 6-6 6"/></svg></div>
+    <div class="node"><div class="t">Act, bounded</div><div class="d"><span class="mono">render_fix.py</span> only for 2 safe classes → PR branch (never <span class="mono">main</span>); <span class="mono">auth/*</span> never auto-fixed; else <span class="mono">render_escalate.py</span>.</div></div>
+  </div>
+  <div class="grid grow" style="grid-template-columns:1.05fr 1fr 1fr;gap:14px">
+    <div class="code frag"><header><span class="dot"></span><span class="path">scripts/render_sanitize.py</span><span class="note">3 layers · 10 patterns</span></header>
+<pre><span class="l"><span class="c"># Layer 1 — walk parsed JSON, redact by key name</span></span><span class="l"><span class="k">return</span> {k: REDACTED <span class="k">if</span> _key_is_secret(k) <span class="k">else</span> sanitize_json(v)</span><span class="l">        <span class="k">for</span> k, v <span class="k">in</span> obj.items()}</span><span class="l"></span><span class="l"><span class="c"># Layer 2 — 10 text patterns: PEM blocks, Bearer,</span></span><span class="l"><span class="c">#   rnd_* Render keys, userinfo URLs, JWTs, cookies,</span></span><span class="l"><span class="c">#   sk/ghp/AIza prefixes, secret=value assignments</span></span><span class="l"><span class="k">for</span> pattern, replacement <span class="k">in</span> _REDACTION_PATTERNS:</span><span class="l">    text = pattern.sub(replacement, text)</span><span class="l"></span><span class="l"><span class="c"># Layer 3 — TokenGuard: the literal API key, wherever</span></span><span class="l"><span class="c">#   it could have leaked into a response or traceback</span></span><span class="l">report_text = guard(sanitize_text(<span class="s">"\n".join(...)</span>))</span></pre></div>
+    <div class="card info frag"><h3><span class="ic info">◇</span>Why the safety design is the interesting part</h3>
+      <ul class="bul compact" style="margin-top:4px">
+        <li><b>Read-only by construction:</b> <span class="mono">_http_get</span> only; endpoints that return secrets are never called; <span class="mono">ipAllowList</span>/<span class="mono">sshAddress</span> are dropped from the payload.</li>
+        <li><b>Explicit exit codes</b> (0 live, 3 failed-with-bundle, 4 no matching service, 5 ambiguous, 6 timed out) so CI branches on meaning, not on grep.</li>
+        <li><b>Over-redaction is a deliberate preference</b> — the module says commit SHAs and request IDs must survive, credentials must not.</li>
+        <li><b>Loop protection:</b> per-SHA counter, <span class="mono">MAX_ATTEMPT = 1</span>, no push to <span class="mono">main</span>, no auto-merge, auto-deploy disabled on the fix branch.</li>
+      </ul></div>
+    <div class="card bad frag"><h3><span class="ic bad">!</span>What it cannot actually do (verified)</h3>
+      <ul class="bul compact" style="margin-top:4px">
+        <li>Both fixers only <b>diagnose</b>: <span class="mono">attempt_syntax_fix</span> prints the file and line and returns 2; it never edits. The <span class="mono">import</span> fixer finds a missing package but refuses to guess a version.</li>
+        <li>Consequence: <span class="mono">result == 0</span> is unreachable, so the PR-creation step never fires — the automation escalates reliably but does not self-heal. (Its own docstring still says “add it and validate”.)</li>
+        <li><span class="mono">docs/render-agent.md</span> claims “9-layer sanitization”; the implementation is 3 layers with 10 patterns.</li>
+        <li>Counter files are gitignored, so the counter is per-run; cross-run protection rests on one env var.</li>
+      </ul></div>
+  </div>
+  <div class="evidence"><span class="k2">.github/workflows/render-observe.yml · observe | remediate | escalate</span>
+    <span class="k2">scripts/render_observe.py · FAILURE_PATTERNS, SAFE_AUTO_FIXES, TokenGuard</span>
+    <span class="k2">scripts/render_fix.py · MAX_ATTEMPT = 1</span>
+    <span class="tag part">Design intent is sound; the fix stage is the unfinished third</span></div>
+</section>
+
+<!-- ══════════════════ 12 · SECURITY & RELIABILITY ══════════════════ -->
+<section class="slide" data-title="Security, Reliability &amp; Error Handling" data-notes="Do not read this as a feature list — read it as a three-column verdict: what the code claims, what I could prove by running it, and what is genuinely missing. The three amber rows are where the audit's fixes are incomplete, and those are the ones worth discussing with the professor.">
+  <div class="eyebrow">11 · Security, reliability &amp; error handling</div>
+  <h2>What is actually enforced — with the proof, and the three places it isn't</h2>
+  <div class="grid grow" style="grid-template-columns:1.42fr 1fr;gap:16px">
+    <div class="frag">
+      <table style="font-size:12.4px">
+        <thead><tr><th style="width:22%">Control</th><th>Implementation in this repository</th><th class="c" style="width:11%">Status</th></tr></thead>
+        <tbody>
+        <tr><td><b>Authentication</b></td><td class="mono-cell">Server-side Flask session; session.clear() before login (fixation); 8 h lifetime; PBKDF2 hashes; hash stripped before any response</td><td class="c"><span class="tag ok">verified</span></td></tr>
+        <tr><td><b>Authorisation</b></td><td class="mono-cell">2 decorators × 26 routes; RBAC returns 403 (measured on /api/customers as CUSTOMER); IDOR check on shipment detail (measured 403). But role-scoped ≠ owner-scoped: a DRIVER may overwrite <i>any</i> shipment's status (measured 200)</td><td class="c"><span class="tag ok">verified</span></td></tr>
+        <tr><td><b>Cookie hardening</b></td><td class="mono-cell">HttpOnly · SameSite=Lax · Secure when not DEBUG — confirmed in a live Set-Cookie header</td><td class="c"><span class="tag ok">verified</span></td></tr>
+        <tr><td><b>Input handling</b></td><td class="mono-cell">Field allowlist + server-owned fields; parameterised SQL throughout; <b>no</b> schema validation layer — types coerced inline</td><td class="c"><span class="tag part">partial</span></td></tr>
+        <tr><td><b>Rate limiting</b></td><td class="mono-cell">Default 200/min works (429 measured at request 201). The “10/min login” and “5/min OTP” limits <b>do not fire</b>: 25 rapid logins → all 401, no X-RateLimit headers</td><td class="c"><span class="tag no">gap</span></td></tr>
+        <tr><td><b>Secrets</b></td><td class="mono-cell">Config raises RuntimeError in prod without SECRET_KEY; seed passwords env-only; gitleaks pre-commit + CI; historical leak documented with a SHA-scoped allowlist</td><td class="c"><span class="tag ok">verified</span></td></tr>
+        <tr><td><b>Audit logging</b></td><td class="mono-cell">11 structured JSON events, PII redacted (ad**@domain); log lines confirmed in a real run. No correlation ID; IP recorded as proxy IP (no ProxyFix)</td><td class="c"><span class="tag part">partial</span></td></tr>
+        <tr><td><b>Error handling</b></td><td class="mono-cell">One handler: 429. Everything else → uncaught; DB connections closed manually with no <span class="mono">finally</span>, and debug mode renders the SQL error to the client</td><td class="c"><span class="tag no">gap</span></td></tr>
+        <tr><td><b>CSRF · headers</b></td><td class="mono-cell">SameSite=Lax only; no CSRF token, no CSP / HSTS / X-Frame-Options anywhere in the repo</td><td class="c"><span class="tag no">gap</span></td></tr>
+        <tr><td><b>Resilience</b></td><td class="mono-cell">No retries, no circuit breaker, no idempotency keys, no backoff on the DB path; DB-init failure is <span class="mono">print</span>ed and the app boots anyway</td><td class="c"><span class="tag no">gap</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="stack">
+      <div class="code frag"><header><span class="dot"></span><span class="path">backend/logger.py</span><span class="note">real line from a real login attempt</span></header>
+<pre><span class="l">{<span class="s">"timestamp"</span>: <span class="s">"2026-09-12T08:17:47Z"</span>,</span><span class="l"> <span class="s">"event"</span>: <span class="s">"LOGIN_FAILURE"</span>,</span><span class="l"> <span class="s">"email"</span>: <span class="s">"no**@x.com"</span>,      <span class="c"># ← PII redacted</span></span><span class="l"> <span class="s">"ip"</span>: <span class="s">"127.0.0.1"</span>,</span><span class="l"> <span class="s">"reason"</span>: <span class="s">"user_not_found"</span> }  <span class="c"># ← same message for</span></span><span class="l">                                  <span class="c">#   unknown user and</span></span><span class="l">                                  <span class="c">#   bad password</span></span></pre></div>
+      <div class="card frag"><h3>The three gaps, and their one-line fixes</h3>
+        <ol class="bul compact" style="margin-top:4px">
+          <li><b>Per-route limits never attach.</b> <span class="mono">limiter.limit(...)</span> is applied to the view after <span class="mono">register_blueprint()</span>, which flask-limiter does not re-read. Fix: decorate the function in <span class="mono">routes.py</span>.</li>
+          <li><b>Leaked DB connections on failure.</b> On an exception between <span class="mono">get_db_connection()</span> and <span class="mono">conn.close()</span>, the connection stays open holding SQLite's write lock → subsequent writes fail with <span class="mono">database is locked</span>. Fix: <span class="mono">try/finally</span> or a <span class="mono">@contextmanager</span>.</li>
+          <li><b>Client identity vs. owner field.</b> <span class="mono">customer_id</span> bypasses the allowlist (slide 8); FK violation is the only thing that stops it.</li>
+        </ol></div>
+      <div class="card ok frag"><h3><span class="ic ok">✓</span>Injection check</h3>
+        <p><span class="mono">?search=' OR 1=1--</span> returned an empty result set, and a non-enum status was rejected by the schema's
+        <span class="mono">CHECK</span>. There is no string-formatted SQL in the backend: every query I read uses
+        <span class="mono">?</span> placeholders — including the ops scripts.</p></div>
+    </div>
+  </div>
+  <div class="evidence"><span class="k2">backend/auth.py</span><span class="k2">backend/app.py · limiter + errorhandler(429)</span>
+    <span class="k2">backend/services.py · _SHIPMENT_ALLOWED_FIELDS</span><span class="k2">docs/SECURITY_AUDIT.md · F-01…F-15</span>
+    <span class="tag ok">Green rows reproduced by me</span><span class="tag no">Amber/red rows reproduced too — they are not guesses</span></div>
+</section>
+<!-- ══════════════════ 13 · TESTING & QUALITY ══════════════════ -->
+<section class="slide" data-title="Testing &amp; Quality" data-notes="The honest headline: there are zero automated tests in this repository. What exists instead is a strong static-analysis pipeline — that is a real engineering choice, but it is not testing, and the CI job that looks like a test job exits 0 when tests/ is missing. Say this before the professor finds it; it converts a weakness into evidence of understanding.">
+  <div class="eyebrow">12 · Testing &amp; quality</div>
+  <h2>Strong gates, no tests — an honest picture of the quality bar</h2>
+  <div class="grid grow" style="grid-template-columns:1.3fr 1fr;gap:16px">
+    <div class="stack">
+      <div class="card frag"><h3><span class="ic navy">▶</span>CI job 1 — <span class="mono">fast-checks</span> (&lt; 60 s, blocks merge)</h3>
+        <div class="row" style="margin:8px 0 6px">
+          <span class="chip v">py_compile · 11 files</span><span class="chip v">gitleaks · fetch-depth 0</span>
+          <span class="chip v">semgrep --config .semgrep.yml --error</span><span class="chip v">YAML parse of every workflow</span>
+          <span class="chip v">prohibited-files grep (.db · .env · __pycache__)</span></div>
+        <p>Least privilege is declared at workflow level (<span class="mono">permissions: contents: read</span>) and the
+        <span class="mono">fast-checks</span> job blocks the test job, so a leaked secret never reaches the second stage.
+        I reproduced steps 1, 3, 4 and 5 on this checkout — <span class="mono">py_compile</span>, Semgrep, YAML parse and the prohibited-file check — <b>all clean</b>. (Gitleaks needs its own binary, so that one I read rather than ran.)</p></div>
+      <div class="card warn frag"><h3><span class="ic warn">!</span>CI job 2 — <span class="mono">test-sqlite</span> is green <i>vacuously</i></h3>
+        <div class="code" style="margin:8px 0 0"><header><span class="dot"></span><span class="path">.github/workflows/ci.yml</span></header>
+<pre><span class="l"><span class="k">if</span> [ -d tests ]; <span class="k">then</span></span><span class="l">  pytest tests/ -v --tb=short --cov=backend --cov-report=term-missing</span><span class="l"><span class="k">else</span></span><span class="l markw">  echo <span class="s">"⚠️  No tests/ directory found. Skipping."</span>   <span class="c"># exit 0 → job “passes”</span></span><span class="l"><span class="k">fi</span></span></pre></div>
+        <p style="margin-top:8px"><span class="mono">find . -name "test*" -o -name "*_test.py"</span> → <b>nothing</b>. No unit, no
+        integration, no E2E, no frontend tests, no coverage number exists to report. Job 3, <span class="mono">pip-audit</span>, is
+        explicitly informational (<span class="mono">|| true</span>) until a clean baseline exists.</p></div>
+      <div class="card frag"><h3><span class="ic">⌁</span>Static analysis: 7 custom Semgrep rules — I planted violations to see which fire</h3>
+        <p style="margin-top:6px">I copied the backend, injected one violation per rule, and ran
+        <span class="mono">semgrep --config .semgrep.yml backend/</span> exactly as CI does, then restored the files.</p>
+        <table class="dense" style="font-size:11.9px;box-shadow:none;margin-top:7px">
+          <thead><tr><th>Rule</th><th class="c" style="width:26%">Planted-violation result</th></tr></thead>
+          <tbody>
+          <tr><td class="mono-cell">unauthenticated-route · updated-by-from-request</td><td class="c"><span class="tag ok">fired</span></td></tr>
+          <tr><td class="mono-cell">mass-assignment-status · -payment · hardcoded-secret · weak-otp</td><td class="c"><span class="tag ok">fired</span></td></tr>
+          <tr><td class="mono-cell">apexflow-select-star — <b>16 real <span class="mono">SELECT *</span> sites today</b></td><td class="c"><span class="tag no">never matches</span></td></tr>
+          </tbody>
+        </table>
+        <p style="margin-top:7px">6 of 7 rules are live. The <span class="mono">SELECT *</span> rule is inert —
+        <span class="mono">"SELECT * FROM ..."</span> is matched literally, so <span class="mono">cursor.execute("SELECT * FROM
+        users WHERE x = ?", …)</span> slips through. A guard that cannot fire is worse than no guard: it manufactures
+        confidence. (Also, <span class="mono">SECURITY_AUDIT.md</span> still documents “6 rules”.)</p></div>
+    </div>
+    <div class="stack">
+      <div class="card frag"><h3>Other quality machinery in the repo</h3>
+        <ul class="bul compact" style="margin-top:4px">
+          <li><b>pre-commit</b>: gitleaks + semgrep + private-key/merge-conflict/JSON-YAML checks (<span class="mono">.pre-commit-config.yaml</span>)</li>
+          <li><b>commit-msg hook</b>: Conventional Commits with a <span class="mono">security</span> type allowed — history is machine-readable</li>
+          <li><b>CODEOWNERS</b> + PR template with a security checklist</li>
+          <li><b>docs as contracts</b>: API.md (every endpoint, with the exact error codes) and SECURITY_AUDIT.md (15 findings, each with before/after code)</li>
+        </ul></div>
+      <div class="card accent frag"><h3>My substitute for a test suite</h3>
+        <p>Because there are no tests, I verified behaviour by driving the HTTP API directly — the
+        <b>14 results on the next slide</b> come from that harness (Python <span class="mono">urllib</span>, cookie jar,
+        4 role logins, 127.0.0.1). It is throwaway, not committed, and not a CI gate — which is precisely the gap.</p></div>
+      <div class="card bad frag"><h3>What I would write first</h3>
+        <ol class="bul compact" style="margin-top:4px">
+          <li><b>pytest fixtures</b> on a temp SQLite file + <span class="mono">app.test_client()</span>; a conftest that sets
+          <span class="mono">SECRET_KEY</span> and seed passwords so CI never boots without them</li>
+          <li>Contract tests for the security invariants: 401 unauthenticated, 403 wrong role, 403 IDOR, 201 ignoring
+          <span class="mono">status</span>/<span class="mono">payment_status</span></li>
+          <li>The cascade test (OTP → delivered + paid) and the two lockout tests — they would have caught the
+          <span class="mono">customer_id</span> and connection-leak defects</li>
+          <li>Then make <span class="mono">test-sqlite</span> fail if <span class="mono">tests/</span> is missing</li>
+        </ol></div>
+    </div>
+  </div>
+  <div class="evidence"><span class="k2">.github/workflows/ci.yml · 3 jobs</span><span class="k2">.semgrep.yml · 7 rules</span>
+    <span class="k2">.pre-commit-config.yaml</span><span class="k2">.git-hooks/commit-msg</span>
+    <span class="tag no">Test coverage: 0 % — 0 tests exist, and I am not going to imply otherwise</span></div>
+</section>
+
+<!-- ══════════════════ 14 · RESULTS / EVIDENCE ══════════════════ -->
+<section class="slide" data-title="Results — What I Measured" data-notes="This is the slide that separates me from a student who only read the README. Every row was executed against a live instance. Read three rows out loud: the mass-assignment neutralisation (works), the login rate limit (documented but not enforced), and the FK-then-lock cascade (a real bug with a real root cause). Offer the reproduction script if asked.">
+  <div class="band"></div>
+  <div class="eyebrow">13 · Results &amp; verification</div>
+  <h2>I ran the system, not just the analysis — 15 claims, measured</h2>
+  <div class="grid grow" style="grid-template-columns:1.5fr 1fr;gap:16px">
+    <div class="frag">
+      <table class="dense" style="font-size:12px">
+        <thead><tr><th style="width:32%">Claim from the code</th><th>Measured behaviour (live Flask instance, this checkout)</th><th class="c">Result</th></tr></thead>
+        <tbody>
+        <tr><td>Every protected route requires a session</td><td class="mono-cell">GET /api/shipments with no cookie → 401 <span class="s">{"success":false,"message":"Authentication required"}</span></td><td class="c"><span class="tag ok">pass</span></td></tr>
+        <tr><td>RBAC: customers cannot list customers</td><td class="mono-cell">GET /api/customers as CUSTOMER → 403 “requires role: ADMIN or MANAGER”</td><td class="c"><span class="tag ok">pass</span></td></tr>
+        <tr><td>IDOR guard on shipment detail</td><td class="mono-cell">GET /api/shipments/SHP001 as a different customer → 403</td><td class="c"><span class="tag ok">pass</span></td></tr>
+        <tr><td>Mass assignment blocked on booking</td><td class="mono-cell">sent <span class="mono">status/payment_status/shipping_cost</span> → stored <span class="mono">Booked / Pending / ₹3 169</span> (server-computed)</td><td class="c"><span class="tag ok">pass</span></td></tr>
+        <tr><td>OTP never leaves the API</td><td class="mono-cell">GET /api/deliveries → 12 keys, zero <span class="mono">otp_*</span>; OTP readable only in the DB</td><td class="c"><span class="tag ok">pass</span></td></tr>
+        <tr><td>OTP: 6 digits, 30 min TTL, 5 attempts</td><td class="mono-cell">created 6-digit code, <span class="mono">otp_expires_at = +30 min</span>, attempts 4→3→2→1, then locked; correct code after lockout still refused</td><td class="c"><span class="tag ok">pass</span></td></tr>
+        <tr><td>Delivery confirm cascades 4 tables</td><td class="mono-cell">shipment <span class="mono">Delivered</span>, delivery <span class="mono">Delivered</span>+timestamp, invoice <span class="mono">Paid</span>+<span class="mono">paid_date</span>, history row appended</td><td class="c"><span class="tag ok">pass</span></td></tr>
+        <tr><td>Schema enforces the status enum</td><td class="mono-cell"><span class="mono">PUT {"status":"Teleported"}</span> → <span class="mono">IntegrityError: CHECK constraint failed</span> (but as a 500, not a 400)</td><td class="c"><span class="tag part">pass, ugly</span></td></tr>
+        <tr><td>Parameterised SQL (no injection)</td><td class="mono-cell"><span class="mono">?search=' OR 1=1--</span> → 200 with an empty list; 16 <span class="mono">SELECT *</span> queries all use <span class="mono">?</span> binds</td><td class="c"><span class="tag ok">pass</span></td></tr>
+        <tr><td>Login limited to 10 / minute</td><td class="mono-cell">25 rapid bad logins → 25 × 401, <b>no 429</b>, no X-RateLimit headers. Reproduced on flask-limiter 4.1.1 <i>and</i> 3.5.1</td><td class="c"><span class="tag no">fail</span></td></tr>
+        <tr><td>Default limit 200 / minute</td><td class="mono-cell">first 429 at request <b>201</b>, with <span class="mono">X-RateLimit-*</span> headers → proves the limiter works, only the per-route attach is broken</td><td class="c"><span class="tag ok">pass</span></td></tr>
+        <tr><td>Booking is safe for any role</td><td class="mono-cell">CUSTOMER booking → 500: <span class="mono">FOREIGN KEY constraint failed</span> (<span class="mono">customer_id := user_id “USR004”</span>, absent from <span class="mono">customers</span>)</td><td class="c"><span class="tag no">fail</span></td></tr>
+        <tr><td>DB connections are released</td><td class="mono-cell">one failed write leaks the connection → next valid write fails after 5.02 s with <span class="mono">database is locked</span> (reproduced deterministically; 20 concurrent <i>valid</i> writes all succeeded in 0.15 s, so it is the leak, not contention)</td><td class="c"><span class="tag no">fail</span></td></tr>
+        <tr><td>Shipment lifecycle is a state machine</td><td class="mono-cell">no transition table exists: <span class="mono">Delivered → Booked</span> accepted with <span class="mono">200</span>; a DRIVER updated an unassigned shipment</td><td class="c"><span class="tag no">gap</span></td></tr>
+        <tr><td>Cost, ETA and distance are computed</td><td class="mono-cell">same shipment priced ₹21 845…₹23 042 across 7 processes; Ludhiana→Chennai = 430 km from string length; all trucks share one progress clock (10 %→14 % in 4 s)</td><td class="c"><span class="tag no">not real</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="stack">
+      <div class="code frag"><header><span class="dot"></span><span class="path">GET /api/reports/dashboard · live</span><span class="note">seeded DB, no mock</span></header>
+<pre><span class="l">{ <span class="s">"success"</span>: true,</span><span class="l">  <span class="s">"data"</span>: {</span><span class="l">    <span class="s">"total_shipments"</span>: <span class="n">5</span>, <span class="s">"in_transit"</span>: <span class="n">2</span>,</span><span class="l">    <span class="s">"delivered"</span>: <span class="n">1</span>, <span class="s">"delayed"</span>: <span class="n">1</span>,</span><span class="l">    <span class="s">"available_vehicles"</span>: <span class="n">2</span>, <span class="s">"total_vehicles"</span>: <span class="n">5</span>,</span><span class="l">    <span class="s">"active_drivers"</span>: <span class="n">4</span>, <span class="s">"total_drivers"</span>: <span class="n">5</span>,</span><span class="l mark">    <span class="s">"total_revenue"</span>: <span class="n">99200.0</span>,</span><span class="l">    <span class="s">"estimated_fuel_cost"</span>: <span class="n">50880.0</span>,</span><span class="l">    <span class="s">"recent_shipments"</span>: [ <span class="n">5</span> rows ],</span><span class="l">    <span class="s">"recent_vehicles"</span>:   [ <span class="n">5</span> rows ] } }</span></pre></div>
+      <div class="code frag"><header><span class="dot"></span><span class="path">GET /api/tracking/SHP001 · live telemetry</span></header>
+<pre><span class="l">{ <span class="s">"vehicle_reg"</span>: <span class="s">"HR26BX4587"</span>, <span class="s">"status"</span>: <span class="s">"In Transit"</span>,</span><span class="l">  <span class="s">"latitude"</span>: <span class="n">30.67229</span>, <span class="s">"longitude"</span>: <span class="n">77.00762</span>,</span><span class="l">  <span class="s">"speed_kmh"</span>: <span class="n">51</span>, <span class="s">"distance_remaining_km"</span>: <span class="n">265.4</span>,</span><span class="l">  <span class="s">"eta"</span>: <span class="s">"5h 12m"</span>, <span class="s">"progress_percent"</span>: <span class="n">10</span> }</span></pre></div>
+      <div class="card ok frag"><h3><span class="ic ok">✓</span>What the system does produce</h3>
+        <p>From 6 seeded JSON files and one <span class="mono">initialize_database()</span> call: 5 shipments, 5 vehicles,
+        5 drivers, 4 corridors, 3 deliveries with live OTPs, 4 invoices, 4 notifications, and a dashboard whose numbers
+        are real <span class="mono">GROUP BY</span> aggregates over those rows — not sample data rendered client-side.</p></div>
+      <div class="card frag"><h3>Reproduce in five commands</h3>
+        <div class="mono" style="font-size:11.4px;line-height:1.75;color:var(--navy)">
+python3 -m venv venv &amp;&amp; . venv/bin/activate<br>
+pip install -r requirements.txt<br>
+python3 backend/app.py<br>
+curl -s -c /tmp/c -X POST localhost:5050/api/auth/login \<br>
+&nbsp;&nbsp;-H 'Content-Type: application/json' -d '{"email":"admin@apexflow.com","password":"…"}'<br>
+curl -s -b /tmp/c localhost:5050/api/reports/dashboard</div>
+        <p style="margin-top:6px">Semgrep, py_compile and the YAML checks run offline on this checkout; I ran them.</p></div>
+    </div>
+  </div>
+  <div class="evidence"><span>Method: fresh <span class="b">SQLite</span> DB, dev-mode Flask on 127.0.0.1, Python 3.11, requests driven by a throwaway
+  <span class="b">urllib</span> harness with four role cookie-jars; timings are single-request latencies on loopback — <b>not</b> load tests.</span></div>
+</section>
+<!-- ══════════════════ 15 · CHALLENGES ══════════════════ -->
+<section class="slide" data-title="Challenges &amp; Engineering Decisions" data-notes="Six decisions, each with the cost named. The rule I want to leave with the committee: every one of these was chosen to keep the dependency count and the moving parts low, and in three cases that choice is exactly what produced the bug I found.">
+  <div class="eyebrow">14 · Challenges &amp; engineering decisions</div>
+  <h2>Challenge → Decision → what it cost</h2>
+  <div class="stack grow" style="gap:11px;margin-top:4px">
+    <div class="grid frag" style="grid-template-columns:1fr 1.15fr 1.15fr;gap:11px;align-items:stretch">
+      <div class="card" style="padding:13px 15px"><div class="num">CHALLENGE</div><h3 style="font-size:14.6px">One codebase, two databases</h3>
+        <p>SQLite for a zero-setup demo, PostgreSQL for a real deploy — with different row types, placeholders and DDL keywords.</p></div>
+      <div class="card" style="padding:13px 15px"><div class="num">DECISION</div><h3 style="font-size:14.6px">A 90-line adapter, not an ORM</h3>
+        <p><span class="mono">PostgresCursorWrapper</span> rewrites <span class="mono">?</span>→<span class="mono">%s</span> and strips
+        <span class="mono">AUTOINCREMENT</span>; <span class="mono">PostgresRow(dict)</span> adds
+        <span class="mono">__getitem__(int)</span> so <span class="mono">row[0]</span> works; connection choice is one
+        <span class="mono">if</span> on <span class="mono">DATABASE_URL</span>; a failure falls back to SQLite so a demo never dies.</p></div>
+      <div class="card warn" style="padding:13px 15px"><div class="num">COST</div><h3 style="font-size:14.6px">Naive rewriting + a dangerous fallback</h3>
+        <p>Text replacement is not a parser: it rewrites inside string literals too. The fallback can silently persist to a file
+        instead of the production DB, and stripping <span class="mono">AUTOINCREMENT</span> leaves no sequence for
+        <span class="mono">history_id</span>. Migrations: an idempotent <span class="mono">ALTER TABLE</span> inside
+        <span class="mono">except Exception: pass</span>.</p></div>
+    </div>
+    <div class="grid frag" style="grid-template-columns:1fr 1.15fr 1.15fr;gap:11px;align-items:stretch">
+      <div class="card" style="padding:13px 15px"><div class="num">CHALLENGE</div><h3 style="font-size:14.6px">Authorise 26 routes, 4 roles, and one object-ownership rule</h3>
+        <p>Plus keep every denial visible in a log.</p></div>
+      <div class="card" style="padding:13px 15px"><div class="num">DECISION</div><h3 style="font-size:14.6px">Sessions + two decorators, no JWT</h3>
+        <p>The browser is the only client, so a signed <span class="mono">HttpOnly</span> cookie beats a bearer token the page must store. Ownership is
+        enforced twice on purpose — in the list query and again on the detail read.</p></div>
+      <div class="card warn" style="padding:13px 15px"><div class="num">COST</div><h3 style="font-size:14.6px">Same-origin lock-in + coverage by hand</h3>
+        <p>No token means no native client without rework; CSRF rests on <span class="mono">SameSite=Lax</span> alone; and per-route protection is
+        only complete if someone decorates every new route — 25 of 26 today, with a Semgrep rule as the only backstop.</p></div>
+    </div>
+    <div class="grid frag" style="grid-template-columns:1fr 1.15fr 1.15fr;gap:11px;align-items:stretch">
+      <div class="card" style="padding:13px 15px"><div class="num">CHALLENGE</div><h3 style="font-size:14.6px">“Real-time” tracking with no GPS, no map key, no socket server</h3></div>
+      <div class="card" style="padding:13px 15px"><div class="num">DECISION</div><h3 style="font-size:14.6px">Deterministic simulation + 4 s polling + <span class="mono">&lt;canvas&gt;</span></h3>
+        <p>Position is interpolated between two city coordinates by a clock-derived factor; the client draws the route itself,
+        so there is no tile provider, no API key quota and no WebSocket infrastructure to grade.</p></div>
+      <div class="card warn" style="padding:13px 15px"><div class="num">COST</div><h3 style="font-size:14.6px">A demo that cannot be mistaken for the real thing — yet</h3>
+        <p>All shipments share one clock (lockstep, rewinding every 100 s), the “no active shipment” case returns a fabricated row, and
+        the fallback coordinate pretends any unknown city is Delhi. Honest only while the label says “simulation”.</p></div>
+    </div>
+    <div class="grid frag" style="grid-template-columns:1fr 1.15fr 1.15fr;gap:11px;align-items:stretch">
+      <div class="card" style="padding:13px 15px"><div class="num">CHALLENGE</div><h3 style="font-size:14.6px">Money and status must never be client-set — with no framework to help</h3></div>
+      <div class="card" style="padding:13px 15px"><div class="num">DECISION</div><h3 style="font-size:14.6px">Explicit allowlist + constants + read-back</h3>
+        <p><span class="mono">safe = {k for k in ALLOWED}</span>, then <span class="mono">status='Booked'</span> as a literal, and the
+        response is re-read from the DB so the client sees what was stored, not what it asked for.</p></div>
+      <div class="card bad" style="padding:13px 15px"><div class="num">COST</div><h3 style="font-size:14.6px">A hand-maintained list is a bug generator</h3>
+        <p>One field read from <span class="mono">data</span> instead of <span class="mono">safe</span> re-opened the hole I
+        measured; two aliases (<span class="mono">customer</span>/<span class="mono">pickup</span>/<span class="mono">weight</span>)
+        sit in the allowlist as UI conveniences; and the same payload shape is duplicated in 14 JS modules and 0 schema files.
+        A Pydantic or JSON-Schema model would remove this entire class of mistake.</p></div>
+    </div>
+    <div class="grid frag" style="grid-template-columns:1fr 1.15fr 1.15fr;gap:11px;align-items:stretch">
+      <div class="card" style="padding:13px 15px"><div class="num">CHALLENGE</div><h3 style="font-size:14.6px">“Works on my machine” deployments, with no budget for a staging environment</h3></div>
+      <div class="card" style="padding:13px 15px"><div class="num">DECISION</div><h3 style="font-size:14.6px">Give CI read-only access to the platform and bound its authority</h3>
+        <p>Observe → classify → redact → (optionally) propose → escalate to a human; <span class="mono">auth/*</span> failures are
+        never auto-fixed; the whole thing is stdlib <span class="mono">urllib</span> so CI needs no extra install step.</p></div>
+      <div class="card warn" style="padding:13px 15px"><div class="num">COST</div><h3 style="font-size:14.6px">Ceremony without a payoff yet</h3>
+        <p>Because the fix stage never mutates a file, today's agent buys faster diagnosis but no shorter MTTR — and its
+        documented guarantees (“9 layers”, “adds the missing package”) overstate the implementation.</p></div>
+    </div>
+  </div>
+  <div class="evidence"><span class="k2">backend/database.py · PostgresConnWrapper</span><span class="k2">backend/tracking.py</span>
+    <span class="k2">backend/services.py · create_shipment</span><span class="k2">scripts/render_*.py</span>
+    <span class="tag part">Each “COST” cell is something I would change — and could justify changing</span></div>
+</section>
+
+<!-- ══════════════════ 16 · LIMITATIONS & FUTURE ══════════════════ -->
+<section class="slide" data-title="Limitations" data-notes="Three buckets of real gaps, each with a reproduction or a line reference. The fourth card separates <i>scope decisions</i> from <i>defects</i> — a simulation you label is a choice, a simulation you present as live data is a lie. If challenged on any single bullet, give the file, the command, and what came back.">
+  <div class="eyebrow">15 · Limitations</div>
+  <h2>What this is not — gaps, each with a reproduction</h2>
+  <div class="grid grow" style="grid-template-columns:1fr 1fr">
+    <div class="stack">
+      <div class="card warn frag"><h3><span class="ic warn">⚠</span>Correctness &amp; data</h3>
+        <ul class="bul compact" style="margin-top:4px">
+          <li>Booking is <b>unusable for the CUSTOMER role</b>: <span class="mono">user_id</span> is written into
+            <span class="mono">customer_id</span> with no user→customer mapping — measured HTTP 500 on the FK.</li>
+          <li>A failed write <b>leaks the connection</b> and poisons every later write for the process&rsquo;s lifetime.</li>
+          <li><b>Freight cost is a salted hash</b>, so invoices are irreproducible; GST (18 %) is a literal.</li>
+          <li>Distance, ETA and speed come from <b>string lengths and a clock</b>; 3 seeded deliveries still carry 4-digit OTPs.</li>
+          <li>No state-machine validation; <b>no indexes</b> beyond PK/UNIQUE; no pagination, so <span class="mono">LIKE &rsquo;%x%&rsquo;</span> scans grow linearly.</li>
+          <li><span class="mono">DELETE /api/shipments/:id</span> 500s whenever an invoice exists — the <span class="mono">payments</span> FK has no <span class="mono">ON DELETE CASCADE</span> (measured).</li>
+        </ul></div>
+      <div class="card bad frag"><h3><span class="ic bad">✗</span>Security, quality &amp; the client</h3>
+        <ul class="bul compact" style="margin-top:4px">
+          <li><b>0 tests.</b> Per-route rate limits inert. No CSRF token, no CSP / HSTS / X-Frame-Options, no password policy.</li>
+          <li><b>24 client renderings</b> put server strings into <span class="mono">innerHTML</span> with no escaping helper and no backend sanitisation.
+            I confirmed the payload is stored and returned raw; I <b>could not execute it</b> — no browser here, and I will not claim a result I did not observe.</li>
+          <li>OTP plaintext and compared with <span class="mono">!=</span>; the Deliveries page renders the <span class="mono">otp_code</span> field
+            F-05 removed, so operators see <b>undefined</b>. <span class="mono">/deliveries</span> and <span class="mono">/notifications</span> are not role-scoped.</li>
+          <li>Debug 500 pages echo SQL errors to the client; <span class="mono">data/*.json</span> is read by nothing; the login page hardcodes demo passwords in
+            <span class="mono">onclick</span>. Docs claim an MIT <span class="mono">LICENSE</span> that is not in the tree, 6 Semgrep rules where 7 exist,
+            and “9-layer” sanitisation where 3 layers exist.</li>
+        </ul></div>
+    </div>
+    <div class="stack">
+      <div class="card bad frag"><h3><span class="ic bad">◱</span>Scale &amp; ops limits</h3>
+        <ul class="bul compact" style="margin-top:4px">
+          <li>One-process assumptions everywhere: in-memory limiter (per worker), no Redis unless <span class="mono">REDIS_URL</span> is set.</li>
+          <li>One connection per service call, no pool, no shared transaction across the 5 writes.</li>
+          <li>Single Render web service; <span class="mono">healthCheckPath: /</span> only proves Flask serves HTML, not that the DB answers.</li>
+          <li>No container image, no lockfile — <span class="mono">requirements.txt</span> is range-pinned, so builds are not reproducible.</li>
+        </ul></div>
+      <div class="card info frag"><h3><span class="ic info">✦</span>Deliberate scope decisions — not defects</h3>
+        <ul class="bul compact" style="margin-top:4px">
+          <li><b>Simulated telemetry and pricing formulas</b>: the interesting engineering was the API contract and the security layer, not GPS plumbing — so they are labelled, not hidden.</li>
+          <li><b>No ORM.</b> 1,914 lines of explicit SQL, every statement parameterised, integrity declared in the schema.</li>
+          <li><b>No JS framework or bundler.</b> <span class="mono">pip install -r requirements.txt &amp;&amp; python3 backend/app.py</span> is the whole setup a reviewer needs.</li>
+          <li><b>Read-only ops automation.</b> It cannot merge, cannot push to <span class="mono">main</span>, cannot touch <span class="mono">auth/*</span>.</li>
+        </ul>
+        <p style="margin-top:7px">I list these because a limitation and a scope decision look identical in a feature list and behave very differently in a review.</p></div>
+    </div>
+  </div>
+  <div class="evidence"><span class="k2">backend/services.py · create_shipment / delete_shipment</span><span class="k2">frontend/js/*.js · 24 innerHTML sites</span><span class="k2">.github/workflows/ci.yml · test-sqlite</span><span class="k2">docs/PRESENTATION-NOTES.md § 8 · claim → line → command</span></div>
+</section>
+
+<section class="slide" data-title="Future Work" data-notes="Every item is scoped so it can be finished, and each one removes a bullet from the previous slide — that is the point of the pairing. If asked 'why that order?', answer: user-visible breakage, then verifiability, then hardening, then scale. Item 6 is the honest one: my own ops agent has a stage that cannot succeed, and I would rather delete it than describe it as working.">
+  <div class="eyebrow">16 · Future improvements</div>
+  <h2>The next six changes, in the order I would do them</h2>
+  <div class="grid grow" style="grid-template-columns:1.25fr .85fr">
+    <div class="stack">
+      <div class="card ok frag"><h3><span class="ic ok">⇢</span>Ordered plan — each item deletes a bullet from the previous slide</h3>
+        <ol class="bul compact" style="margin-top:5px">
+          <li><b>Correctness — ≈1 day.</b> <span class="mono">safe.get(&#39;customer_id&#39;)</span> plus a real user→customer mapping;
+            a <span class="mono">@contextmanager</span> around connections; a city-pair distance table replacing <span class="mono">hash()</span>.</li>
+          <li><b>Make the gates real — ≈2 days.</b> Commit the harness I probed with as <span class="mono">tests/test_api.py</span>;
+            attach limits at route definition; let <span class="mono">test-sqlite</span> fail when <span class="mono">tests/</span> is absent.</li>
+          <li><b>Close the obvious holes — ≈2 days.</b> <span class="mono">errorhandler(Exception)</span> so clients stop seeing SQL text;
+            an <span class="mono">escapeHtml()</span> helper or <span class="mono">textContent</span> in the client; role-scope <span class="mono">/deliveries</span> and <span class="mono">/notifications</span>; CSP + HSTS + <span class="mono">ProxyFix</span>.</li>
+          <li><b>Make the domain honest — ≈1 week.</b> A transition table for the 10 states; one serialiser (Pydantic or JSON-Schema) shared with the client;
+            OTP hashed at rest with <span class="mono">secrets.compare_digest</span>, a re-issue endpoint and a real delivery channel.</li>
+          <li><b>Then scale and ops — ≈1 week.</b> Indexes + pagination; Redis for the limiter store; Alembic migrations; a lockfile and a container image;
+            a <span class="mono">/healthz</span> that actually queries the DB.</li>
+          <li><b>Finish the agent — ≈2 days.</b> Let <span class="mono">render_fix.py</span> write the one fix it can safely write (a missing dependency line),
+            so <span class="mono">result == 0</span> becomes reachable and its PR path stops being dead code — or delete the stage and call it a diagnosis agent.</li>
+        </ol></div>
+      <div class="card frag" style="padding:11px 15px"><p style="margin:0"><b>Ranked by user-visible breakage first, not by how interesting the fix is.</b>
+        Items 1 and 2 exist because a broken booking and an unverifiable claim are the two failures a reviewer cannot work around;
+        hardening and scale can wait a week.</p></div>
+    </div>
+    <div class="stack">
+      <div class="card info frag"><h3><span class="ic info">∞</span>Research directions I would like to pursue</h3>
+        <ul class="bul compact" style="margin-top:4px">
+          <li><b>Real telemetry ingestion:</b> an append-only position table, ETA from remaining distance and traffic rather than a clock.</li>
+          <li><b>Route computation:</b> OSRM or Valhalla behind a cache, with the <span class="mono">routes</span> table kept as the warm tier.</li>
+          <li><b>Multi-tenant authorisation</b> as one policy object evaluated per request, replacing scattered role <span class="mono">if</span>s.</li>
+          <li><b>Property-based tests</b> (Hypothesis) over the shipment state machine — the tool that would have found the missing edge rules for free.</li>
+        </ul>
+        <p style="margin-top:7px">Each is a seminar-length project on its own; I would rather name them than imply they are one sprint away.</p></div>
+      <div class="card frag"><h3><span class="ic">✓</span>What I would keep unchanged</h3>
+        <p style="margin-top:4px">Decorator-based authorisation, server-owned money fields, the CSPRNG OTP with a persisted attempt counter,
+        the append-only status history, three-layer redaction before any artefact leaves CI, and the rule that the ops agent can read logs but never
+        read its own credential.</p></div>
+    </div>
+  </div>
+  <div class="evidence"><span class="k2">backend/services.py · the one-word fix</span><span class="k2">.github/workflows/ci.yml · test-sqlite</span><span class="k2">scripts/render_fix.py · unreachable success path</span><span class="k2">docs/PRESENTATION-NOTES.md § 5 · answers 17–20</span></div>
+</section>
+
+<section class="slide dark" data-title="Conclusion" data-notes="Sixty seconds, four sentences. What it is, what it isn't, what the measurements bought me, and what I take away. Land the last line and stop talking.">
+  <div class="grow" style="display:flex;flex-direction:column;justify-content:center">
+    <div class="eyebrow">17 · Conclusion</div>
+    <h2 class="rise" style="font-size:38px;max-width:26ch;--d:.08s">A logistics app is easy. Proving what it actually does is the project.</h2>
+    <div class="grid cols-2" style="margin-top:24px;gap:14px">
+      <div class="card frag"><h3>Problem → Solution</h3>
+        <p>Fragmented shipment status, no proof of delivery, drifting fleet compliance. APEX FLOW answers with one API that
+        binds a booking to an audit trail, an OTP-gated delivery event and an invoice — 26 endpoints, 12 tables, 15 pages,
+        4 roles.</p></div>
+      <div class="card frag"><h3>Key technical achievement</h3>
+        <p>The security layer is not bolted on: 15 audited findings closed with decorators, allowlists, CSPRNG OTPs,
+        hardened cookies, a PII-redacting structured logger, 7 SAST rules and a deployment agent that cannot leak a token —
+        and I can name the file and function for each.</p></div>
+      <div class="card frag"><h3>What the measurements bought</h3>
+        <p>They turned a confident feature list into three real bugs — a broken customer booking, an inert rate limit, and a
+        write path that locks itself after one failure — plus proof that the parts that matter (IDOR, mass assignment, OTP
+        lockout, SQL parameterisation) genuinely work.</p></div>
+      <div class="card frag"><h3>What I learned</h3>
+        <p>Documentation is not enforcement: the audit says a control exists, the code says whether it fires. A single
+        un-<span class="mono">finally</span>-ed connection is an outage. And a simulation must be labelled, or it becomes a claim.</p></div>
+    </div>
+    <div style="margin-top:22px;display:flex;justify-content:space-between;align-items:flex-end;gap:24px">
+      <div class="small" style="max-width:62ch;line-height:1.6">
+        <b style="color:#fff">Direction:</b> correctness → tests that run in CI → closed authorisation gaps → real telemetry and
+        routing. Not new pages: the system's surface area is already wider than its verification.</div>
+      <div style="text-align:right;font-size:12.6px;color:#93b6d6">
+        <div class="mono" style="font-size:14px;color:#fff">nandan503/Apex-Flow</div>
+        <div>Flask · vanilla JS · SQLite/PostgreSQL · GitHub Actions · Render · README claims an MIT LICENSE that is not in the tree</div></div>
+    </div>
+  </div>
+  <div class="evidence"><span>Slides generated from the repository at commit <span class="k2">47d7308</span>; runtime claims reproduced on
+    a live instance of this checkout on <span class="k2">2026-09-12</span>. Companion document:
+    <b>docs/PRESENTATION-NOTES.md</b> (30 s / 2 min pitches, Q&amp;A, claim→file evidence map, known weak points).</span></div>
+</section>
+
+</div></div>
+<div id="bar"><i></i></div>
+<div id="brand"><span class="sq"></span> APEX FLOW · technical defence</div>
+<div id="pageno"></div>
+<div id="overlay"><div id="ovgrid"></div></div>
+<div id="notes"></div>
+<script src="deck.js"></script>
+</body>
+</html>
