@@ -149,7 +149,7 @@ td.c,th.c{text-align:center}
   box-shadow:var(--shadow);min-width:0;flex:1}
 .node .t{font-size:13.4px;font-weight:730;letter-spacing:-.01em;color:var(--navy);display:flex;align-items:center;gap:7px}
 .node .d{font-size:11.8px;color:var(--muted);line-height:1.42;margin-top:3px}
-.node .m{font-family:var(--mono);font-size:10.7px;color:var(--blue-dim);margin-top:4px;
+.node .m{font-family:var(--mono);font-size:11.4px;color:var(--blue-dim);margin-top:4px;
   background:var(--blue-wash);border-radius:5px;padding:2px 6px;display:inline-block}
 .node.hero{border-color:rgba(7,137,255,.4);box-shadow:0 0 0 3px rgba(7,137,255,.10),var(--shadow)}
 .arrow{display:grid;place-items:center;color:#a8c0d8;flex:none;width:26px}
@@ -161,7 +161,7 @@ td.c,th.c{text-align:center}
 /* ── evidence / footnote strip ───────────────────────────────────────── */
 .evidence{margin-top:auto;padding-top:14px;display:flex;gap:14px;align-items:center;flex-wrap:wrap;
   border-top:1px dashed var(--line);font-size:11.9px;color:var(--muted)}
-.evidence .k2{font-family:var(--mono);font-size:11.2px;background:#fff;border:1px solid var(--line);
+.evidence .k2{font-family:var(--mono);font-size:11.4px;background:#fff;border:1px solid var(--line);
   border-radius:6px;padding:2px 7px;color:var(--navy);box-shadow:0 1px 1px rgba(11,31,58,.05)}
 .evidence b{color:var(--navy);font-weight:700}
 
@@ -172,7 +172,7 @@ ul.bul li::before{content:"";position:absolute;left:2px;top:.55em;width:6px;heig
   background:var(--blue);transform:rotate(45deg)}
 ol.bul{counter-reset:n}
 ol.bul li::before{counter-increment:n;content:counter(n);position:absolute;left:0;top:1px;
-  font-family:var(--mono);font-size:11px;color:var(--blue-dim);font-weight:700}
+  font-family:var(--mono);font-size:11.4px;color:var(--blue-dim);font-weight:700}
 ul.bul li b,ol.bul li b{color:var(--navy)}
 ul.bul.compact li{margin-bottom:4px;font-size:13px}
 
@@ -237,7 +237,7 @@ body.showhint #hint{opacity:1}
   background-clip:text;color:transparent}
 .tagline{font-size:19px;color:#bcd8f2;margin:16px 0 0;font-weight:500;letter-spacing:-.01em}
 .meta{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:26px}
-.meta .m1{font-size:10.6px;letter-spacing:.13em;text-transform:uppercase;color:#89aed0;font-weight:750}
+.meta .m1{font-size:11.4px;letter-spacing:.13em;text-transform:uppercase;color:#89aed0;font-weight:750}
 .meta .m2{font-size:14px;color:#fff;font-weight:650;margin-top:4px}
 
 /* section divider band */
@@ -253,6 +253,7 @@ body.showhint #hint{opacity:1}
   border-radius:12px;padding:13px 15px;color:#dcebf9;cursor:pointer;font-family:var(--sans);
   transition:transform .18s ease,background .18s ease}
 #ovgrid button:hover{background:rgba(7,137,255,.22);transform:translateY(-2px)}
+/* presenter-only chrome — not slide content, so it stays below the 11.4px floor */
 #ovgrid button .n{font-family:var(--mono);font-size:10.5px;color:#8fd0ff;display:block;margin-bottom:5px}
 #ovgrid button .t2{font-size:13px;font-weight:680;letter-spacing:-.01em;line-height:1.3}
 
@@ -291,7 +292,7 @@ body.showhint #hint{opacity:1}
 /* dense table variant for evidence-dense slides */
 table.dense{font-size:11.7px}
 table.dense th,table.dense td{padding:6px 10px}
-table.dense .mono-cell{font-size:11.3px;line-height:1.45}
+table.dense .mono-cell{font-size:11.4px;line-height:1.45}
 
 /* entrance for the title/closing slides — one-time, not fragment-driven */
 @keyframes rise{from{opacity:0;transform:translateY(15px)}to{opacity:1;transform:none}}

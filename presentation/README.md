@@ -108,6 +108,14 @@ than turning clipping back on.
 17. Future improvements — an ordered plan, each item deleting a bullet from slide 16
 18. Conclusion
 
+## Was this deck checked?
+
+`docs/PRESENTATION-NOTES.md` § 12 is the red-team pass: ten self-check questions, each answered by a *command* rather
+than an opinion (every named path and function resolved against the source, every `%`/`ms` traced, panel lengths,
+contrast ratios from the real hex pairs, the type floor, the animation inventory, the external-URL scan) — plus § 12.11,
+the ten things that pass actually caught and fixed, and § 12.12, the one thing it could not check without a browser.
+If a number on a slide is challenged, § 8 is the claim → file → function → measurement map.
+
 ## Accuracy policy used while building this deck
 
 - No capability was claimed that is not present in the code or its docs.

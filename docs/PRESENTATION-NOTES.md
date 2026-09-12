@@ -477,14 +477,74 @@ if you finish the sentence.
   animations · `F` fullscreen · `?` shortcut hint; `#7` deep-links to slide 7.
 - Slides are authored at 1280 × 720 and scaled to any viewport; `deck.js` additionally measures each slide and, if a
   slide is taller than the stage, reflows and scales it so nothing can clip on a projector.
-- **Print to PDF** for a submission copy (PDF, A4 landscape, background graphics on). Print CSS reveals all fragments
+- **Print to PDF** for a submission copy: background graphics **on**, scale **100 %**, margins **none**. Page size
+  needs no setting — the stylesheet declares `@page{size:1280px 724px}`. Print CSS reveals all fragments
   and paginates one slide per page.
-- Palette, type scale and card geometry are taken from the product's own tokens in
-  `frontend/css/style.css` (`--primary-navy`, `--accent-blue`, `--success`, `--warning`, `--danger`) so the deck looks
-  like the artefact it describes. Contrast: `--ink #0b1f3a` on `--bg #f6f8fc` ≈ 13:1; body text ≥ 11.4 px at 1280 × 720
-  (≈ 21 px on a 1920 projector).
+- Palette and card geometry are taken from the product's own tokens in `frontend/css/style.css`:
+  `--primary-navy #062b57`, `--accent-blue #0789ff`, `--success #08a75a`, `--warning #f59e0b`, `--danger #ef3348`
+  are reused byte-for-byte as `--navy`, `--blue`, `--ok`, `--warn`, `--bad`, so the deck looks like the artefact.
+  Two values are deliberately *derived* rather than copied, and I should say so if asked: the body ink is darkened
+  from the product's `--text-main #14213d` to `--ink #0b1f3a`, and the page from `--bg-main #f4f7fb` to `--bg #f6f8fc`.
+  Measured WCAG contrast: `--ink` on `--bg` = **15.54:1**; `--muted #5a6f88` on `--bg` = **4.86:1** (passes AA for
+  normal text, not AAA — muted is used only for secondary text, never for a number the argument depends on).
+  Type floor: every on-slide size is **≥ 11.4 px** at the 1280 × 720 design box, i.e. ≈ 17 px when the stage scales to
+  a 1920-wide projector (11.4 × 1.5). The only smaller sizes are off-slide chrome: `#brand` and `#hint` (11 px),
+  the overview tile number and the speaker-notes heading (10.5 px) — none of them carries slide content.
 - **Fill in `META` at the top of `deck.js` (line 10) before the viva** (name, course, reviewer). Unfilled fields stay visibly
   marked, on screen and in the PDF — an unpersonalised title slide is the one self-inflicted wound available here.
 - `prefers-reduced-motion` is honoured; a `.no-anim` mode (press **A**) exists for room projectors that stutter.
 - Nothing on any slide is decorative-only: every diagram node names a file, and every "verified" tag traces to
   section 8.
+
+---
+
+## 12. Red-team pass — the ten self-check questions
+
+Run against the final deck (18 slides) on **2026-09-12**. Each row records the *check that produced the answer*, not an
+opinion. Where the check failed, what it found is listed in 12.11 — that list is the reason this section exists.
+
+| # | Question | How I checked it | Result |
+|---|---|---|---|
+| 1 | Is every named component, file and function real? | Extracted all 20 repo paths and all 25 `name()` calls from the deck; `os.path.exists` / substring search in `backend/*.py`, `frontend/js/*.js`, `scripts/*.py` | **Pass.** All 20 exist. Three apparent misses were regex artefacts, each checked by hand: the tree diagram writes `js/app.js` and `css/style.css` *relative* to their `frontend/` parent node (correct for a tree; `frontend/js/app.js` is spelled in full wherever it is cited outside the diagram), and `scripts/render_*` is a deliberate glob. All functions exist except `app.test_client()`, which is Flask's own API, cited in the "what I would write first" card |
+| 2 | Did I invent any metric? | Regexed every `%`, `ms`, throughput and "coverage" mention | **Pass.** The only percentages are `0 %` (coverage, honestly), `10 % → 14 %` (measured tracking drift) and `18 %` (the hardcoded GST rate). The only latency is `10 ms`, captioned *"That is not a benchmark"*. No throughput, no user counts, no coverage figure |
+| 3 | Does any slide show a whole source file? | Counted `<span class="l">` rows per `<pre>` across all 13 code panels | **Pass.** Longest panel is **14 lines**; the largest real module is `services.py` at 526 |
+| 4 | One primary idea per slide? | Counted `.eyebrow` per `<section>` | **Pass.** Exactly one per slide, 18/18 — the eyebrow is the slide's single claim |
+| 5 | Are limitations separated from future work? | Read the slide list | **Pass.** Slide 16 *Limitations* (gaps + reproductions, with "deliberate scope decisions — not defects" kept distinct), slide 17 *Future Work* (six-item ordered plan). They were one wall-of-text slide until the pass split them |
+| 6 | Is the architecture diagram free of imaginary components? | Same path check as #1, applied to every diagram node label | **Pass.** Every node carries a file it maps to; no "microservice", "cache", "queue" or "gateway" appears that the code does not contain |
+| 7 | Is anything exaggerated or sold as production-ready? | Vocabulary scan for `revolutionary`, `game-changing`, `enterprise-grade`, `cutting-edge`, `seamless`, `robust`, `scalable`, `bulletproof`, `100% …`, `fully tested`, `production-ready`, and 12 more | **Pass — 0 hits.** The deck's own register is "verified", "reproduced", "heuristic", "simulated", "inert", "vacuous" |
+| 8 | Is mocked, partial or dead code explicitly labelled? | Counted hedge vocabulary and semantic tags | **Pass.** `hardcoded` ×3, `heuristic` ×4, `simulation` ×8, `inert` ×3, `vacuous` ×1; tags: 17 ✓ *verified*, 8 ⚠ *partial*, 14 ✗ *gap*. Colour is the carrier: green = reproduced working, amber = partial/by-design, red = reproduced failure |
+| 9 | Will it survive a projector and a print? | WCAG contrast from the actual hex pairs; every `font-size` in the deck; `@page` and the `--pz` handoff | **Pass after fix.** `--ink #0b1f3a` on `--bg #f6f8fc` = **15.54:1**; muted 4.86:1 (AA, used only for secondary text). On-slide type floor raised to **11.4 px** (≈ 17 px at 1920 wide). Print now reuses the auto-fit factor as `zoom` so a dense slide prints at the size it projects at |
+| 10 | Is the animation restrained and the deck self-contained? | `@keyframes` inventory; `rotate/zoom/spin` scan; external-URL scan | **Pass.** Three keyframes only (`pulse`, `flowdash`, `rise`); `rotate()` appears in two *static* transforms (a vertical-flow arrow, a 45° list bullet); `prefers-reduced-motion` honoured plus a manual freeze (`A`). **Zero** external URLs — the only references are `deck.css` and `deck.js`, so it opens from disk with no network |
+
+**12.11 · What the pass actually caught.** A self-check that finds nothing is theatre, so these are the real failures it
+turned up, in the order they were found:
+
+1. **"12 failure categories"** in the ops agent → the code has **21 fragments resolving to 12 (category, subcategory)
+   pairs across 4 categories**. Overstated precision, corrected on slide 11.
+2. **"No pagination"** → too blunt. The backend does use `LIMIT` twice (`reports.py:35,39`, dashboard side-panels);
+   *list* endpoints have none. Slide 16 now says exactly that.
+3. **"auth + 4 inserts"** on the booking flow → `create_shipment()` performs **5** INSERTs. Corrected on slide 7.
+4. **"data/routes.json · 4 corridors"** → the DB seeds 4 route rows; the JSON file has **2 and is read by nothing**.
+   Footer rewritten to name `backend/database.py:412`.
+5. **Contrast "≈ 13:1"** → measured **15.54:1**. The claim was in the right direction but was a guess, and a guessed
+   number in a defence document is worse than no number.
+6. **Type floor was 10.5–11.3 px** in four on-slide rules (`.node .m`, `.evidence .k2`, `.meta .m1`, `.dense .mono-cell`)
+   while the notes claimed "≥ 11.4 px". The code was wrong, not the claim — the rules were raised.
+7. **The printed PDF clipped dense slides.** `autoFit()` writes an inline `width`/`transform` onto `.fit`; the old print
+   block reset only `#stage`, and `.slide{height:720px}` truncated anything taller. Fixed via the `--pz` → `zoom`
+   handoff and `min-height`.
+8. **An earlier SAST conclusion was simply wrong**: "all 7 Semgrep rules are inert" came from running semgrep in a
+   scratch directory, where it scans **0 files**. Re-run from the repo root with planted violations, **6 of 7 rules
+   fire**; only `apexflow-select-star` is inert. This is the most important entry in the list, because the mistake was
+   an error in *method*, not arithmetic, and it would have understated the project's own quality machinery.
+9. **A slide-editing error of mine** merged slides 9 and 10 and deleted the OTP trade-offs card, because a
+   tag-boundary search matched `<pre`/`<path` as if they were `<p`. Both slides were rebuilt by hand and re-verified.
+   (Method note kept here on purpose: in this file, match a tag only when the name is followed by whitespace or `>`.)
+10. **The title slide shipped with `<your name>` in it.** Now driven by a `META` object, with unfilled placeholders
+    visibly marked and an on-slide warning, so it cannot reach a projector or a submitted PDF unnoticed.
+
+**12.12 · What I could not check, stated plainly.** There is no browser in the sandbox (no Chromium, and WeasyPrint
+cannot import without libpango/libcairo), so layout and print output are verified *structurally* — jsdom over the real
+files reports 18 slides, 18 `.fit` wrappers, 97 fragments, `--pz` set on every slide, keyboard walk 18 → 1, deep-link
+`#18` works, and **0 JS errors** — not as rendered pixels. The one remaining action on a real machine is a 20-second
+print-to-PDF smoke test: expect 18 pages, one slide each, nothing cut off at the right or bottom edge.
